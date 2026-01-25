@@ -96,13 +96,35 @@ Esta aplicación está diseñada para desplegarse en el subdominio `empresas.tra
 
 ### Vercel
 
-1. Conecta tu repositorio a Vercel
-2. Configura el proyecto:
-   - Framework Preset: Next.js
-   - Build Command: `npm run build`
-   - Output Directory: `.next`
-3. Agrega la variable de entorno `NEXT_PUBLIC_API_URL`
-4. Despliega
+El proyecto incluye un archivo `vercel.json` configurado para Next.js. Para desplegar:
+
+1. **Conecta tu repositorio a Vercel**
+   - Ve a [vercel.com](https://vercel.com) e inicia sesión
+   - Importa tu repositorio de GitHub/GitLab/Bitbucket
+   - Selecciona el directorio `web-empresas` como raíz del proyecto
+
+2. **Configuración automática**
+   - Vercel detectará automáticamente Next.js gracias al `vercel.json`
+   - El framework preset será: **Next.js**
+   - Build Command: `npm run build` (automático)
+   - Output Directory: `.next` (automático)
+
+3. **Variables de entorno**
+   - En la configuración del proyecto, ve a **Settings > Environment Variables**
+   - Agrega la variable:
+     - **Name**: `NEXT_PUBLIC_API_URL`
+     - **Value**: `https://api.trabajo-ya.com` (o tu URL de producción)
+   - Asegúrate de agregarla para todos los entornos (Production, Preview, Development)
+
+4. **Dominio personalizado (opcional)**
+   - En **Settings > Domains**, agrega `empresas.trabajo-ya.com`
+   - Configura los registros DNS según las instrucciones de Vercel
+
+5. **Despliega**
+   - Haz clic en **Deploy** o realiza un push a la rama principal
+   - Vercel desplegará automáticamente en cada push
+
+**Nota**: El archivo `vercel.json` ya está configurado con headers de caché optimizados para assets estáticos.
 
 ### Otras plataformas
 
