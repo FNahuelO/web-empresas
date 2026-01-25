@@ -73,7 +73,7 @@ export default function PlanesPage() {
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {plans.map((plan) => {
-            const isCurrentPlan = currentPlanCode === plan.code.toUpperCase();
+            const isCurrentPlan = currentPlanCode === plan.code?.toUpperCase();
             return (
               <div
                 key={plan.id}
@@ -82,22 +82,22 @@ export default function PlanesPage() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
+                  <h3 className="text-xl font-bold text-gray-900">{plan.name || 'Plan'}</h3>
                   {isCurrentPlan && (
                     <span className="rounded-full bg-primary-600 px-3 py-1 text-xs font-semibold text-white">
                       Actual
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-sm text-gray-600">{plan.description}</p>
+                <p className="mt-2 text-sm text-gray-600">{plan.description || ''}</p>
                 <div className="mt-4">
                   <span className="text-3xl font-bold text-gray-900">
-                    ${plan.price}
+                    ${plan.price || 0}
                   </span>
-                  <span className="text-sm text-gray-600">/{plan.currency}</span>
+                  <span className="text-sm text-gray-600">/{plan.currency || 'USD'}</span>
                 </div>
                 <ul className="mt-6 space-y-3">
-                  {plan.features.map((feature, index) => (
+                  {(plan.features || []).map((feature, index) => (
                     <li key={index} className="flex items-start">
                       <CheckIcon className="h-5 w-5 flex-shrink-0 text-primary-600" />
                       <span className="ml-3 text-sm text-gray-600">{feature}</span>

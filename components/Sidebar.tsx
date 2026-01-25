@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -23,7 +24,7 @@ const navigation = [
   { name: 'Configuración', href: '/configuracion', icon: Cog6ToothIcon },
 ];
 
-export default function Sidebar() {
+function SidebarContent() {
   const pathname = usePathname();
   const { logout, user } = useAuthStore();
   const router = useRouter();
@@ -80,6 +81,22 @@ export default function Sidebar() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function Sidebar() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen w-64 flex-col bg-secondary-900">
+          <div className="flex h-16 items-center justify-center border-b border-secondary-800">
+            <div className="h-4 w-24 animate-pulse rounded bg-secondary-700"></div>
+          </div>
+        </div>
+      }
+    >
+      <SidebarContent />
+    </Suspense>
   );
 }
 
