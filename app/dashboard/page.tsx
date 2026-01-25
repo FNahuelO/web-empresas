@@ -43,11 +43,13 @@ export default function DashboardPage() {
       ]);
 
       setProfile(profileData);
-      setJobs(jobsData);
+      // Asegurar que jobsData sea un array
+      const jobsArray = Array.isArray(jobsData) ? jobsData : [];
+      setJobs(jobsArray);
       setSubscription(subscriptionData);
 
       // Calcular estadísticas
-      const activeJobs = jobsData.filter(
+      const activeJobs = jobsArray.filter(
         (job) => job.status === 'active' || job.status === 'activo'
       );
       setStats((prev) => ({ ...prev, activeJobs: activeJobs.length }));
@@ -60,9 +62,10 @@ export default function DashboardPage() {
       for (const job of activeJobs.slice(0, 5)) {
         try {
           const applicants = await jobService.getJobApplicants(job.id);
-          allApplications.push(...applicants);
-          totalApplicants += applicants.length;
-          interviews += applicants.filter(
+          const applicantsArray = Array.isArray(applicants) ? applicants : [];
+          allApplications.push(...applicantsArray);
+          totalApplicants += applicantsArray.length;
+          interviews += applicantsArray.filter(
             (app) => app.status === 'INTERVIEW' || app.estado === 'entrevista'
           ).length;
         } catch (error) {
@@ -295,7 +298,7 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-gray-200">
-            {jobs
+            {Array.isArray(jobs) && jobs
               .filter((job) => job.status === 'active' || job.status === 'activo')
               .slice(0, 5)
               .map((job) => (

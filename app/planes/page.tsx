@@ -20,14 +20,16 @@ export default function PlanesPage() {
     try {
       setLoading(true);
       const [plansData, subscriptionData] = await Promise.all([
-        subscriptionService.getPlans(),
+        subscriptionService.getPlans().catch(() => []),
         subscriptionService.getCurrentSubscription().catch(() => null),
       ]);
-      setPlans(plansData);
+      // Asegurar que plansData sea un array
+      setPlans(Array.isArray(plansData) ? plansData : []);
       setSubscription(subscriptionData);
     } catch (error: any) {
       toast.error('Error al cargar planes');
       console.error(error);
+      setPlans([]);
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,7 @@ export default function PlanesPage() {
         )}
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {plans.map((plan) => {
+          {Array.isArray(plans) && plans.length > 0 ? plans.map((plan) => {
             const isCurrentPlan = currentPlanCode === plan.code?.toUpperCase();
             return (
               <div
@@ -120,7 +122,11 @@ export default function PlanesPage() {
                 </div>
               </div>
             );
-          })}
+          }) : (
+            <div className="col-span-full rounded-lg bg-white p-12 text-center shadow">
+              <p className="text-sm text-gray-500">No hay planes disponibles</p>
+            </div>
+          )}
         </div>
       </div>
     </Layout>

@@ -19,10 +19,12 @@ export default function MensajesPage() {
     try {
       setLoading(true);
       const data = await messageService.getConversations();
-      setConversations(data);
+      // Asegurar que data sea un array
+      setConversations(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast.error('Error al cargar conversaciones');
       console.error(error);
+      setConversations([]);
     } finally {
       setLoading(false);
     }
@@ -60,7 +62,7 @@ export default function MensajesPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {conversations.map((conversation) => (
+            {Array.isArray(conversations) && conversations.map((conversation) => (
               <div
                 key={conversation.userId}
                 className="overflow-hidden rounded-lg bg-white shadow hover:shadow-md transition-shadow"

@@ -30,10 +30,12 @@ export default function PublicacionesPage() {
     try {
       setLoading(true);
       const data = await jobService.getCompanyJobs();
-      setJobs(data);
+      // Asegurar que data sea un array
+      setJobs(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast.error('Error al cargar publicaciones');
       console.error(error);
+      setJobs([]);
     } finally {
       setLoading(false);
     }
@@ -147,7 +149,7 @@ export default function PublicacionesPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {jobs.map((job) => {
+            {Array.isArray(jobs) && jobs.map((job) => {
               const applicantsCount = job._count?.applications || 0;
               const publishedDate = job.publishedAt || job.fechaPublicacion;
 

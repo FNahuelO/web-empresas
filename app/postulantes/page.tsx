@@ -34,7 +34,8 @@ function PostulantesContent() {
         jobService.getJobApplicants(jobId),
         jobService.getJobDetail(jobId).catch(() => null),
       ]);
-      setApplications(applicantsData);
+      // Asegurar que applicantsData sea un array
+      setApplications(Array.isArray(applicantsData) ? applicantsData : []);
       setJob(jobData);
     } catch (error: any) {
       toast.error('Error al cargar postulantes');
@@ -54,7 +55,8 @@ function PostulantesContent() {
       for (const job of activeJobs) {
         try {
           const applicants = await jobService.getJobApplicants(job.id);
-          allApplications.push(...applicants.map((app) => ({ ...app, job })));
+          const applicantsArray = Array.isArray(applicants) ? applicants : [];
+          allApplications.push(...applicantsArray.map((app) => ({ ...app, job })));
         } catch (error) {
           console.error(`Error loading applicants for job ${job.id}:`, error);
         }
@@ -103,7 +105,7 @@ function PostulantesContent() {
           </div>
         ) : (
           <div className="space-y-4">
-            {applications.map((application) => {
+            {Array.isArray(applications) && applications.map((application) => {
               const postulante = application.postulante;
               const job = application.job;
               const fullName =
