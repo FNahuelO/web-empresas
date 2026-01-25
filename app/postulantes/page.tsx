@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { jobService } from '@/services/jobService';
@@ -11,7 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 
-export default function PostulantesPage() {
+function PostulantesContent() {
   const searchParams = useSearchParams();
   const jobId = searchParams.get('jobId');
   const [applications, setApplications] = useState<Application[]>([]);
@@ -165,6 +165,22 @@ export default function PostulantesPage() {
         )}
       </div>
     </Layout>
+  );
+}
+
+export default function PostulantesPage() {
+  return (
+    <Suspense
+      fallback={
+        <Layout>
+          <div className="flex items-center justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"></div>
+          </div>
+        </Layout>
+      }
+    >
+      <PostulantesContent />
+    </Suspense>
   );
 }
 
