@@ -161,7 +161,7 @@ export default function PublicacionesPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
                           <h3 className="text-lg font-semibold text-gray-900">
-                            {job.title || job.titulo || 'Sin título'}
+                            {job.title || 'Sin título'}
                           </h3>
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(
@@ -217,7 +217,7 @@ export default function PublicacionesPage() {
                           <PencilIcon className="h-4 w-4" />
                         </Link>
                         <button
-                          onClick={() => handleDelete(job.id, job.title || job.titulo || '')}
+                          onClick={() => handleDelete(job.id, job.title || '')}
                           disabled={deletingId === job.id}
                           className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                         >

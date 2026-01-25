@@ -260,7 +260,7 @@ export default function DashboardPage() {
                         <div>
                           <p className="text-sm font-medium text-gray-900">{fullName}</p>
                           <p className="text-sm text-gray-500">
-                            {job?.title || job?.titulo || 'Empleo'}
+                            {job?.title || 'Empleo'}
                           </p>
                           {application.appliedAt && (
                             <p className="text-xs text-gray-400">
@@ -303,7 +303,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-900">
-                        {job.title || job.titulo || 'Sin título'}
+                        {job.title || 'Sin título'}
                       </p>
                       <p className="text-sm text-gray-500">
                         {job.ciudad && job.provincia

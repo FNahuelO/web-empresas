@@ -86,7 +86,7 @@ export default function PostulantesPage() {
           <h1 className="text-3xl font-bold text-gray-900">Postulantes</h1>
           {job && (
             <p className="mt-1 text-sm text-gray-500">
-              Postulantes para: {job.title || job.titulo}
+              Postulantes para: {job.title}
             </p>
           )}
         </div>
@@ -135,7 +135,7 @@ export default function PostulantesPage() {
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-gray-900">{fullName}</h3>
                           <p className="text-sm text-gray-600">
-                            {job?.title || job?.titulo || 'Empleo'}
+                            {job?.title || 'Empleo'}
                           </p>
                           {postulante?.city && (
                             <p className="text-xs text-gray-500">{postulante.city}</p>
