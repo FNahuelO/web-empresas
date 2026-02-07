@@ -44,7 +44,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           accessToken: string;
           refreshToken: string;
         };
-      }>(API_ENDPOINTS.AUTH.LOGIN, { email, password });
+      }>(API_ENDPOINTS.AUTH.LOGIN, { email, password, source: 'web-empresas' });
 
       const { user: userData, accessToken, refreshToken } = response.data;
 
