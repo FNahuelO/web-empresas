@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   role: 'EMPRESA' | 'POSTULANTE';
-  nombreEmpresa?: string;
+  companyName?: string;
 }
 
 export interface EmpresaProfile {
@@ -33,6 +33,8 @@ export interface Job {
   jobType?: string;
   workMode?: string;
   modality?: string;
+  category?: string;
+  experienceLevel?: string;
   status: string;
   moderationStatus?: string;
   moderationReason?: string;
@@ -48,6 +50,89 @@ export interface Job {
   _count?: {
     applications?: number;
   };
+  // Payment fields
+  isPaid?: boolean;
+  paymentOrderId?: string;
+  paymentAmount?: number;
+  paymentCurrency?: string;
+  paymentStatus?: string;
+  paidAt?: string;
+  // Entitlements (from backend)
+  entitlements?: Array<{
+    id: string;
+    maxEdits: number;
+    editsUsed: number;
+    maxCategoryChanges: number;
+    categoryChangesUsed: number;
+    status: string;
+    expiresAt: string;
+    planKey: string;
+  }>;
+}
+
+export interface Experience {
+  id: string;
+  position: string;
+  company: string;
+  startDate: string;
+  endDate?: string;
+  isCurrent?: boolean;
+  experienceLevel?: string;
+  companyCountry?: string;
+  jobArea?: string;
+  companyActivity?: string;
+  description?: string;
+  peopleInCharge?: string;
+}
+
+export interface Education {
+  id: string;
+  degree: string;
+  institution: string;
+  startDate: string;
+  endDate?: string;
+  isCurrent?: boolean;
+  country?: string;
+  studyArea?: string;
+  studyType?: string;
+  status?: string;
+  description?: string;
+}
+
+export interface PostulanteProfile {
+  id: string;
+  userId: string;
+  email?: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  gender?: string;
+  nationality?: string;
+  phone?: string;
+  alternatePhone?: string;
+  avatar?: string;
+  profilePicture?: string;
+  city?: string;
+  province?: string;
+  country?: string;
+  address?: string;
+  resumeTitle?: string;
+  professionalDescription?: string;
+  employmentStatus?: string;
+  minimumSalary?: number;
+  cv?: string;
+  cvUrl?: string;
+  videoUrl?: string;
+  experiences?: Experience[];
+  education?: Education[];
+  skills?: string[];
+  languages?: Array<{ language: string; level: string }>;
+  linkedInUrl?: string;
+  portfolioUrl?: string;
+  websiteUrl?: string;
+  githubUrl?: string;
+  user?: { email: string };
 }
 
 export interface Application {
@@ -59,21 +144,7 @@ export interface Application {
   appliedAt?: string;
   fechaAplicacion?: string;
   job?: Job;
-  postulante?: {
-    id: string;
-    userId: string;
-    fullName?: string;
-    firstName?: string;
-    lastName?: string;
-    avatar?: string;
-    profilePicture?: string;
-    city?: string;
-    resumeTitle?: string;
-    professionalDescription?: string;
-    cv?: string;
-    cvUrl?: string;
-    videoUrl?: string;
-  };
+  postulante?: PostulanteProfile;
 }
 
 export interface Subscription {
@@ -95,36 +166,47 @@ export interface Plan {
   description: string;
   price: number;
   currency: string;
+  durationDays: number;
   allowedJobs: number;
   allowedModifications: number;
   hasAIFeature: boolean;
+  hasFeaturedOption: boolean;
+  canModifyCategory: boolean;
+  categoryModifications: number;
   features: string[];
+  isActive?: boolean;
+  order?: number;
+}
+
+export interface ApiUserInfo {
+  id: string;
+  email: string;
+  userType: 'POSTULANTE' | 'EMPRESA';
+  postulante?: {
+    id: string;
+    fullName: string;
+    profilePicture?: string;
+  };
+  empresa?: {
+    id: string;
+    companyName: string;
+    logo?: string;
+  };
 }
 
 export interface Message {
   id: string;
-  senderId: string;
-  receiverId: string;
+  fromUserId: string;
+  toUserId: string;
   content: string;
-  read: boolean;
+  isRead: boolean;
   createdAt: string;
-  sender?: {
-    id: string;
-    email: string;
-    nombreEmpresa?: string;
-  };
-  receiver?: {
-    id: string;
-    email: string;
-  };
+  fromUser?: ApiUserInfo;
+  toUser?: ApiUserInfo;
 }
 
 export interface Conversation {
-  userId: string;
-  userName: string;
-  userAvatar?: string;
-  lastMessage?: string;
-  lastMessageDate?: string;
+  user: ApiUserInfo;
+  lastMessage: Message;
   unreadCount: number;
 }
-

@@ -1,26 +1,58 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import Sidebar from './Sidebar';
+import { Bars3Icon } from '@heroicons/react/24/outline';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, loadUser } = useAuthStore();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const checkAuth = useCallback(async () => {
+    const token = localStorage.getItem('accessToken');
+    const refreshToken = localStorage.getItem('refreshToken');
+
+    if (token || refreshToken) {
+      if (!isAuthenticated) {
+        await loadUser();
+      }
+    } else if (!isLoading) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, isLoading, loadUser, router]);
 
   useEffect(() => {
-    const init = async () => {
-      const token = localStorage.getItem('accessToken');
-      if (token && !isAuthenticated) {
-        await loadUser();
-      } else if (!token && !isLoading) {
-        router.push('/login');
+    checkAuth();
+  }, [checkAuth]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const token = localStorage.getItem('accessToken');
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!token && !refreshToken && isAuthenticated) {
+          router.push('/login');
+        }
       }
     };
 
-    init();
-  }, [isAuthenticated, isLoading, loadUser, router]);
+    const handleOnline = () => {
+      if (isAuthenticated) {
+        loadUser().catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [isAuthenticated, loadUser, router]);
 
   if (isLoading) {
     return (
@@ -36,11 +68,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-8">{children}</div>
-      </main>
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Mobile top bar */}
+        <div className="flex h-14 items-center border-b border-gray-200 bg-white px-4 lg:hidden">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+          >
+            <Bars3Icon className="h-6 w-6" />
+          </button>
+          <h1 className="ml-3 text-lg font-bold text-gray-900">TrabajoYa</h1>
+        </div>
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
-

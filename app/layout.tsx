@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "TrabajoYa - Portal Empresas",
   description: "Gestiona tus publicaciones y postulantes desde el portal web",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/icon-blanco.png",
   },
 };
 

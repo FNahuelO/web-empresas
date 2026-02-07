@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
+import JobDetailModal from '@/components/JobDetailModal';
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<EmpresaProfile | null>(null);
@@ -28,6 +29,8 @@ export default function DashboardPage() {
     interviews: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -111,9 +114,9 @@ export default function DashboardPage() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
               Bienvenido, {profile?.companyName || 'Empresa'}
             </h1>
             <p className="mt-1 text-sm text-gray-500">
@@ -122,7 +125,7 @@ export default function DashboardPage() {
           </div>
           <Link
             href="/publicaciones/nueva"
-            className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+            className="flex items-center justify-center gap-2 rounded-lg bg-[#002D5A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#02345fb6] sm:w-auto"
           >
             <PlusIcon className="h-5 w-5" />
             Nueva Publicación
@@ -191,11 +194,11 @@ export default function DashboardPage() {
         {/* Subscription Card */}
         {subscription && subscription.subscription?.status === 'ACTIVE' && (
           <div className="overflow-hidden rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 shadow">
-            <div className="p-6">
-              <div className="flex items-center justify-between">
+            <div className="p-4 sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-600">Plan Actual</h3>
-                  <p className="mt-1 text-2xl font-bold text-gray-900">
+                  <p className="mt-1 text-xl font-bold text-gray-900 sm:text-2xl">
                     {subscription.planType === 'BASIC' && 'Plan Básico'}
                     {subscription.planType === 'PREMIUM' && 'Plan Premium'}
                     {subscription.planType === 'ENTERPRISE' && 'Plan Enterprise'}
@@ -209,7 +212,7 @@ export default function DashboardPage() {
                 </div>
                 <Link
                   href="/planes"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700"
                 >
                   Gestionar
                 </Link>
@@ -244,9 +247,9 @@ export default function DashboardPage() {
                   'Postulante';
 
                 return (
-                  <div key={application.id} className="px-6 py-4 hover:bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
+                  <div key={application.id} className="px-4 py-4 hover:bg-gray-50 sm:px-6">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center space-x-3 sm:space-x-4">
                         <div className="flex-shrink-0">
                           {postulante?.avatar || postulante?.profilePicture ? (
                             <img
@@ -260,9 +263,9 @@ export default function DashboardPage() {
                             </div>
                           )}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{fullName}</p>
-                          <p className="text-sm text-gray-500">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{fullName}</p>
+                          <p className="text-sm text-gray-500 truncate">
                             {job?.title || 'Empleo'}
                           </p>
                           {application.appliedAt && (
@@ -274,7 +277,7 @@ export default function DashboardPage() {
                       </div>
                       <Link
                         href={`/postulantes/${postulante?.id}`}
-                        className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-700"
+                        className="rounded-md bg-[#002D5A] px-3 py-1.5 text-center text-sm font-semibold text-white hover:bg-[#02345fb6] sm:flex-shrink-0"
                       >
                         Ver Perfil
                       </Link>
@@ -288,7 +291,7 @@ export default function DashboardPage() {
 
         {/* Active Jobs */}
         <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="px-4 py-4 border-b border-gray-200 flex items-center justify-between sm:px-6">
             <h2 className="text-lg font-semibold text-gray-900">Empleos Activos</h2>
             <Link
               href="/publicaciones"
@@ -302,13 +305,13 @@ export default function DashboardPage() {
               .filter((job) => job.status === 'active' || job.status === 'activo')
               .slice(0, 5)
               .map((job) => (
-                <div key={job.id} className="px-6 py-4 hover:bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
+                <div key={job.id} className="px-4 py-4 hover:bg-gray-50 sm:px-6">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
                         {job.title || 'Sin título'}
                       </p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 truncate">
                         {job.ciudad && job.provincia
                           ? `${job.ciudad}, ${job.provincia}`
                           : job.location || 'Ubicación no especificada'}
@@ -319,18 +322,33 @@ export default function DashboardPage() {
                         </p>
                       )}
                     </div>
-                    <Link
-                      href={`/publicaciones/${job.id}`}
-                      className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                    <button
+                      onClick={() => {
+                        setSelectedJob(job);
+                        setShowDetailModal(true);
+                      }}
+                      className="text-sm font-medium text-primary-600 hover:text-primary-700 sm:flex-shrink-0"
                     >
                       Ver detalles
-                    </Link>
+                    </button>
                   </div>
                 </div>
               ))}
           </div>
         </div>
       </div>
+
+      {/* Modal de Detalle de Publicación */}
+      {selectedJob && (
+        <JobDetailModal
+          visible={showDetailModal}
+          job={selectedJob}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedJob(null);
+          }}
+        />
+      )}
     </Layout>
   );
 }

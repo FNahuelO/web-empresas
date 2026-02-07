@@ -1,13 +1,38 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Layout from '@/components/Layout';
 import { jobService } from '@/services/jobService';
 import { subscriptionService } from '@/services/subscriptionService';
-import { Job } from '@/types';
+import { paymentService } from '@/services/paymentService';
+import { Job, Plan } from '@/types';
 import toast from 'react-hot-toast';
+import {
+  CheckIcon,
+  CreditCardIcon,
+  DocumentTextIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline';
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
+import argentinaLocationsData from '@/data/argentina-locations.json';
+
+interface Province {
+  id: string;
+  code: string;
+  name: string;
+}
+
+interface Locality {
+  id: string;
+  name: string;
+  provinceId: string;
+  provinceName: string;
+  municipalityId?: string;
+  municipalityName?: string;
+}
 
 interface JobFormData {
   title: string;
@@ -15,23 +40,70 @@ interface JobFormData {
   requirements: string;
   benefits: string;
   location: string;
+  localidad: string;
   jobType: string;
   modality: string;
+  category: string;
+  experienceLevel: string;
   minSalary: number;
   maxSalary: number;
 }
 
+const JOB_CATEGORIES = [
+  { value: 'COMERCIAL_VENTAS_NEGOCIOS', label: 'Comercial, Ventas y Negocios' },
+  { value: 'ADMIN_CONTABILIDAD_FINANZAS', label: 'Administración, Contabilidad y Finanzas' },
+  { value: 'PRODUCCION_MANUFACTURA', label: 'Producción y Manufactura' },
+  { value: 'OFICIOS_Y_OTROS', label: 'Oficios y Otros' },
+  { value: 'ABASTECIMIENTO_LOGISTICA', label: 'Abastecimiento y Logística' },
+  { value: 'GASTRONOMIA_TURISMO', label: 'Gastronomía y Turismo' },
+  { value: 'TECNOLOGIA_SISTEMAS_TELECOM', label: 'Tecnología, Sistemas y Telecomunicaciones' },
+  { value: 'ATENCION_CLIENTE_CALLCENTER_TELEMARKETING', label: 'Atención al Cliente, Call Center y Telemarketing' },
+  { value: 'SALUD_MEDICINA_FARMACIA', label: 'Salud, Medicina y Farmacia' },
+  { value: 'INGENIERIAS', label: 'Ingenierías' },
+  { value: 'RRHH_CAPACITACION', label: 'Recursos Humanos y Capacitación' },
+  { value: 'MARKETING_PUBLICIDAD', label: 'Marketing y Publicidad' },
+  { value: 'ING_CIVIL_CONSTRUCCION', label: 'Ingeniería Civil y Construcción' },
+  { value: 'LEGALES', label: 'Legales' },
+  { value: 'SECRETARIAS_RECEPCION', label: 'Secretarias y Recepción' },
+  { value: 'DISENO', label: 'Diseño' },
+  { value: 'ADUANA_COMERCIO_EXTERIOR', label: 'Aduana y Comercio Exterior' },
+  { value: 'SEGUROS', label: 'Seguros' },
+  { value: 'GERENCIA_DIRECCION_GENERAL', label: 'Gerencia y Dirección General' },
+  { value: 'MINERIA_PETROLEO_GAS', label: 'Minería, Petróleo y Gas' },
+  { value: 'DEPARTAMENTO_TECNICO', label: 'Departamento Técnico' },
+  { value: 'EDUCACION_DOCENCIA_INVESTIGACION', label: 'Educación, Docencia e Investigación' },
+  { value: 'COMUNICACION_RELACIONES_PUBLICAS', label: 'Comunicación, Relaciones Institucionales y Públicas' },
+  { value: 'ENFERMERIA', label: 'Enfermería' },
+  { value: 'NAVIERA_MARITIMA_PORTUARIA', label: 'Naviero, Marítimo, Portuario' },
+];
+
+const EXPERIENCE_LEVELS = [
+  { value: 'JUNIOR', label: 'Junior' },
+  { value: 'SEMISENIOR', label: 'Semi Senior' },
+  { value: 'SENIOR', label: 'Senior' },
+];
+
+type Step = 'form' | 'payment' | 'success';
+
 export default function NuevaPublicacionPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [canCreate, setCanCreate] = useState(true);
+  const [step, setStep] = useState<Step>('form');
+  const [createdJob, setCreatedJob] = useState<Job | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [paypalOrderId, setPaypalOrderId] = useState<string | null>(null);
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [needsPayment, setNeedsPayment] = useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
     setValue,
     watch,
+    formState: { errors },
   } = useForm<JobFormData>({
     defaultValues: {
       title: '',
@@ -39,60 +111,111 @@ export default function NuevaPublicacionPage() {
       requirements: '',
       benefits: '',
       location: '',
+      localidad: '',
       jobType: 'TIEMPO_COMPLETO',
       modality: 'PRESENCIAL',
+      category: '',
+      experienceLevel: 'JUNIOR',
       minSalary: 0,
       maxSalary: 0,
     },
   });
 
-  useEffect(() => {
-    checkCanCreate();
+  const selectedProvincia = watch('location');
+
+  // Provincias ordenadas alfabéticamente
+  const provinces = useMemo(() => {
+    return [...(argentinaLocationsData.provinces as Province[])].sort((a, b) =>
+      a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+    );
   }, []);
 
-  const checkCanCreate = async () => {
+  // Localidades filtradas por provincia seleccionada
+  const localities = useMemo(() => {
+    if (!selectedProvincia) return [];
+    const province = (argentinaLocationsData.provinces as Province[]).find(
+      (p) => p.name === selectedProvincia
+    );
+    if (!province) return [];
+    return (argentinaLocationsData.localities as Locality[])
+      .filter(
+        (loc) =>
+          loc.provinceId === province.id ||
+          loc.provinceName === province.name
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  }, [selectedProvincia]);
+
+  useEffect(() => {
+    loadPlans();
+  }, []);
+
+  const loadPlans = async () => {
+    setLoadingPlans(true);
     try {
-      const result = await subscriptionService.canCreateJob();
-      setCanCreate(result.canCreate);
-      if (!result.canCreate && !result.hasActiveSubscription) {
-        toast.error('Necesitas un plan activo para publicar empleos');
-        router.push('/planes');
+      const plansData = await subscriptionService.getPlans();
+      const plansArray = Array.isArray(plansData) ? plansData : [];
+      // Filtrar solo planes activos y ordenar por precio
+      const activePlans = plansArray
+        .filter((p: any) => p.isActive !== false)
+        .sort((a: Plan, b: Plan) => (a.order || 0) - (b.order || 0) || a.price - b.price);
+      setPlans(activePlans);
+      if (activePlans.length > 0) {
+        // Seleccionar el plan del medio o el primero
+        const midIndex = Math.floor(activePlans.length / 2);
+        setSelectedPlan(activePlans[midIndex] || activePlans[0]);
       }
     } catch (error) {
-      console.error('Error checking subscription:', error);
+      console.error('Error loading plans:', error);
+    } finally {
+      setLoadingPlans(false);
     }
   };
 
   const onSubmit = async (data: JobFormData) => {
-    if (!canCreate) {
-      toast.error('No puedes crear más empleos con tu plan actual');
-      router.push('/planes');
-      return;
-    }
-
     setIsLoading(true);
     try {
+      const provincia = data.location.trim();
+      const localidad = data.localidad?.trim() || '';
+      const locationStr = localidad ? `${localidad}, ${provincia}` : provincia;
+
       const jobData: any = {
         title: data.title.trim(),
         description: data.description.trim(),
         requirements: data.requirements.trim(),
         benefits: data.benefits.trim(),
-        location: data.location.trim(),
+        location: locationStr,
         jobType: data.jobType,
         workMode: data.modality,
+        experienceLevel: data.experienceLevel,
+        ...(data.category ? { category: data.category } : {}),
       };
 
-      // Parsear ubicación
-      const locationParts = data.location.split(',').map((p) => p.trim());
-      if (locationParts[0]) jobData.city = locationParts[0];
-      if (locationParts[1]) jobData.state = locationParts[1];
+      // Asignar provincia y localidad
+      jobData.state = provincia;
+      if (localidad) jobData.city = localidad;
 
       if (data.minSalary > 0) jobData.minSalary = data.minSalary;
       if (data.maxSalary > 0) jobData.maxSalary = data.maxSalary;
 
-      await jobService.createJob(jobData);
-      toast.success('Publicación creada exitosamente');
-      router.push('/publicaciones');
+      // Enviar planId si hay un plan seleccionado
+      if (selectedPlan?.id) {
+        jobData.planId = selectedPlan.id;
+      }
+
+      const job = await jobService.createJob(jobData);
+      setCreatedJob(job);
+
+      // Verificar si el empleo necesita pago
+      if (job.moderationStatus === 'PENDING_PAYMENT' || job.paymentStatus === 'PENDING' || !job.isPaid) {
+        setNeedsPayment(true);
+        setStep('payment');
+        toast.success('Publicación creada. Selecciona un plan y realiza el pago para publicarla.');
+      } else {
+        // El empleo fue creado directamente (plan PREMIUM/ENTERPRISE)
+        setStep('success');
+        toast.success('¡Publicación creada exitosamente!');
+      }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Error al crear publicación');
       console.error(error);
@@ -101,9 +224,73 @@ export default function NuevaPublicacionPage() {
     }
   };
 
+  const handleCreatePaypalOrder = async (): Promise<string> => {
+    if (!createdJob?.id) {
+      throw new Error('No hay publicación creada');
+    }
+
+    setIsCreatingOrder(true);
+    setPaymentError(null);
+
+    try {
+      const order = await paymentService.createJobPaymentOrder(createdJob.id);
+      setPaypalOrderId(order.orderId);
+      return order.orderId;
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Error al crear orden de pago';
+      setPaymentError(msg);
+      toast.error(msg);
+      throw error;
+    } finally {
+      setIsCreatingOrder(false);
+    }
+  };
+
+  const handlePaypalApprove = async (data: any) => {
+    if (!createdJob?.id) return;
+
+    setIsLoading(true);
+    setPaymentError(null);
+
+    try {
+      const orderId = data.orderID || paypalOrderId;
+      if (!orderId) {
+        throw new Error('No se encontró el ID de la orden');
+      }
+
+      await paymentService.confirmJobPayment(createdJob.id, orderId);
+      setStep('success');
+      toast.success('¡Pago realizado! Tu publicación está siendo revisada.');
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Error al confirmar el pago';
+      setPaymentError(msg);
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePaypalError = (error: any) => {
+    console.error('PayPal error:', error);
+    setPaymentError('Error en el proceso de pago. Por favor, intenta nuevamente.');
+    toast.error('Error en PayPal. Intenta nuevamente.');
+  };
+
+  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+
+  // Stepper indicator
+  const steps = [
+    { key: 'form', label: 'Datos del Empleo', icon: DocumentTextIcon },
+    { key: 'payment', label: 'Pago', icon: CreditCardIcon },
+    { key: 'success', label: 'Publicado', icon: CheckCircleIcon },
+  ];
+
+  const currentStepIndex = steps.findIndex((s) => s.key === step);
+
   return (
     <Layout>
       <div className="mx-auto max-w-4xl">
+        {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Nueva Publicación</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -111,171 +298,581 @@ export default function NuevaPublicacionPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="rounded-lg bg-white p-6 shadow">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Información Básica</h2>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                  Título del Empleo *
-                </label>
-                <input
-                  type="text"
-                  id="title"
-                  {...register('title', { required: 'El título es requerido' })}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-                />
-                {errors.title && (
-                  <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                  Ubicación *
-                </label>
-                <input
-                  type="text"
-                  id="location"
-                  placeholder="Ej: Buenos Aires, Argentina"
-                  {...register('location', { required: 'La ubicación es requerida' })}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-                />
-                {errors.location && (
-                  <p className="mt-1 text-sm text-red-600">{errors.location.message}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="jobType" className="block text-sm font-medium text-gray-700">
-                    Tipo de Empleo
-                  </label>
-                  <select
-                    id="jobType"
-                    {...register('jobType')}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+        {/* Stepper */}
+        <div className="mb-8">
+          <nav aria-label="Progress">
+            <ol className="flex items-center justify-between">
+              {steps.map((s, idx) => {
+                const isCurrent = s.key === step;
+                const isCompleted = idx < currentStepIndex;
+                return (
+                  <li
+                    key={s.key}
+                    className="relative flex flex-1 flex-col items-center"
                   >
-                    <option value="TIEMPO_COMPLETO">Tiempo Completo</option>
-                    <option value="MEDIO_TIEMPO">Medio Tiempo</option>
-                    <option value="FREELANCE">Freelance</option>
-                  </select>
-                </div>
+                    <div className="flex w-full items-center">
+                      {idx > 0 && (
+                        <div
+                          className={`h-0.5 flex-1 ${
+                            idx <= currentStepIndex ? 'bg-primary-600' : 'bg-gray-300'
+                          }`}
+                        />
+                      )}
+                      <div
+                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full sm:h-10 sm:w-10 ${
+                          isCompleted
+                            ? 'bg-primary-600'
+                            : isCurrent
+                            ? 'border-2 border-primary-600 bg-white'
+                            : 'border-2 border-gray-300 bg-white'
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <CheckIcon className="h-4 w-4 text-white sm:h-5 sm:w-5" />
+                        ) : (
+                          <s.icon
+                            className={`h-4 w-4 sm:h-5 sm:w-5 ${
+                              isCurrent ? 'text-primary-600' : 'text-gray-400'
+                            }`}
+                          />
+                        )}
+                      </div>
+                      {idx < steps.length - 1 && (
+                        <div
+                          className={`h-0.5 flex-1 ${
+                            isCompleted ? 'bg-primary-600' : 'bg-gray-300'
+                          }`}
+                        />
+                      )}
+                    </div>
+                    <span
+                      className={`mt-2 text-xs font-medium sm:text-sm ${
+                        isCurrent
+                          ? 'text-primary-600'
+                          : isCompleted
+                          ? 'text-gray-900'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {s.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        </div>
 
+        {/* Step 1: Job Form */}
+        {step === 'form' && (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 text-black">
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">Información Básica</h2>
+              <div className="space-y-4">
                 <div>
-                  <label htmlFor="modality" className="block text-sm font-medium text-gray-700">
-                    Modalidad
-                  </label>
-                  <select
-                    id="modality"
-                    {...register('modality')}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-                  >
-                    <option value="PRESENCIAL">Presencial</option>
-                    <option value="REMOTO">Remoto</option>
-                    <option value="HIBRIDO">Híbrido</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="minSalary" className="block text-sm font-medium text-gray-700">
-                    Salario Mínimo
+                  <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                    Título del Empleo *
                   </label>
                   <input
-                    type="number"
-                    id="minSalary"
-                    {...register('minSalary', { valueAsNumber: true, min: 0 })}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    type="text"
+                    id="title"
+                    {...register('title', { required: 'El título es requerido' })}
+                    className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                   />
+                  {errors.title && (
+                    <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
+                  )}
                 </div>
 
-                <div>
-                  <label htmlFor="maxSalary" className="block text-sm font-medium text-gray-700">
-                    Salario Máximo
-                  </label>
-                  <input
-                    type="number"
-                    id="maxSalary"
-                    {...register('maxSalary', { valueAsNumber: true, min: 0 })}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-                  />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="location" className="block text-sm font-medium text-gray-700">
+                      Provincia *
+                    </label>
+                    <select
+                      id="location"
+                      {...register('location', { required: 'La provincia es requerida' })}
+                      onChange={(e) => {
+                        setValue('location', e.target.value);
+                        setValue('localidad', '');
+                      }}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    >
+                      <option value="">Seleccionar provincia</option>
+                      {provinces.map((province) => (
+                        <option key={province.id} value={province.name}>
+                          {province.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.location && (
+                      <p className="mt-1 text-sm text-red-600">{errors.location.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="localidad" className="block text-sm font-medium text-gray-700">
+                      Localidad
+                    </label>
+                    <select
+                      id="localidad"
+                      {...register('localidad')}
+                      disabled={!selectedProvincia}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {selectedProvincia ? 'Seleccionar localidad' : 'Primero seleccioná una provincia'}
+                      </option>
+                      {localities.map((loc) => (
+                        <option key={loc.id} value={loc.name}>
+                          {loc.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="jobType" className="block text-sm font-medium text-gray-700">
+                      Tipo de Empleo
+                    </label>
+                    <select
+                      id="jobType"
+                      {...register('jobType')}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    >
+                      <option value="TIEMPO_COMPLETO">Tiempo Completo</option>
+                      <option value="MEDIO_TIEMPO">Medio Tiempo</option>
+                      <option value="FREELANCE">Freelance</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="modality" className="block text-sm font-medium text-gray-700">
+                      Modalidad
+                    </label>
+                    <select
+                      id="modality"
+                      {...register('modality')}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    >
+                      <option value="PRESENCIAL">Presencial</option>
+                      <option value="REMOTO">Remoto</option>
+                      <option value="HIBRIDO">Híbrido</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                      Categoría
+                    </label>
+                    <select
+                      id="category"
+                      {...register('category')}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    >
+                      <option value="">Seleccionar categoría</option>
+                      {JOB_CATEGORIES.map((cat) => (
+                        <option key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="experienceLevel" className="block text-sm font-medium text-gray-700">
+                      Nivel de Experiencia *
+                    </label>
+                    <select
+                      id="experienceLevel"
+                      {...register('experienceLevel', { required: 'El nivel de experiencia es requerido' })}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    >
+                      {EXPERIENCE_LEVELS.map((level) => (
+                        <option key={level.value} value={level.value}>
+                          {level.label}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.experienceLevel && (
+                      <p className="mt-1 text-sm text-red-600">{errors.experienceLevel.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="minSalary" className="block text-sm font-medium text-gray-700">
+                      Salario Mínimo
+                    </label>
+                    <input
+                      type="number"
+                      id="minSalary"
+                      {...register('minSalary', { valueAsNumber: true, min: 0 })}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="maxSalary" className="block text-sm font-medium text-gray-700">
+                      Salario Máximo
+                    </label>
+                    <input
+                      type="number"
+                      id="maxSalary"
+                      {...register('maxSalary', { valueAsNumber: true, min: 0 })}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="rounded-lg bg-white p-6 shadow">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Descripción</h2>
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                Descripción del Empleo *
-              </label>
-              <textarea
-                id="description"
-                rows={8}
-                {...register('description', { required: 'La descripción es requerida' })}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-              />
-              {errors.description && (
-                <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">Descripción</h2>
+              <div>
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                  Descripción del Empleo *
+                </label>
+                <textarea
+                  id="description"
+                  rows={8}
+                  {...register('description', { required: 'La descripción es requerida' })}
+                  className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                />
+                {errors.description && (
+                  <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">Requisitos</h2>
+              <div>
+                <label htmlFor="requirements" className="block text-sm font-medium text-gray-700">
+                  Requisitos *
+                </label>
+                <textarea
+                  id="requirements"
+                  rows={6}
+                  {...register('requirements', { required: 'Los requisitos son requeridos' })}
+                  className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                />
+                {errors.requirements && (
+                  <p className="mt-1 text-sm text-red-600">{errors.requirements.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">Beneficios</h2>
+              <div>
+                <label htmlFor="benefits" className="block text-sm font-medium text-gray-700">
+                  Beneficios (Opcional)
+                </label>
+                <textarea
+                  id="benefits"
+                  rows={4}
+                  {...register('benefits')}
+                  className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="rounded-md bg-primary-600 px-6 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {isLoading ? 'Creando...' : 'Continuar'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Step 2: Payment */}
+        {step === 'payment' && createdJob && (
+          <div className="space-y-6">
+            {/* Job Summary */}
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h2 className="text-lg font-semibold text-gray-900">Resumen de la Publicación</h2>
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Título:</span>
+                  <span className="text-sm font-medium text-gray-900">{createdJob.title}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Ubicación:</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {createdJob.ciudad && createdJob.provincia
+                      ? `${createdJob.ciudad}, ${createdJob.provincia}`
+                      : createdJob.location || 'No especificada'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Estado:</span>
+                  <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                    Pendiente de Pago
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Plan Selection */}
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Selecciona un Plan</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Elige el plan que mejor se adapte a tu publicación
+              </p>
+
+              {loadingPlans ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse rounded-lg border-2 border-gray-200 p-4">
+                      <div className="h-5 w-2/3 rounded bg-gray-200 mb-2" />
+                      <div className="h-3 w-full rounded bg-gray-100 mb-3" />
+                      <div className="h-8 w-1/2 rounded bg-gray-200 mb-3" />
+                      <div className="space-y-1">
+                        <div className="h-3 w-3/4 rounded bg-gray-100" />
+                        <div className="h-3 w-2/3 rounded bg-gray-100" />
+                        <div className="h-3 w-1/2 rounded bg-gray-100" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : plans.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {plans.map((plan) => {
+                    const isSelected = selectedPlan?.id === plan.id;
+                    return (
+                      <div
+                        key={plan.id}
+                        onClick={() => setSelectedPlan(plan)}
+                        className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${
+                          isSelected
+                            ? 'border-primary-600 bg-primary-50 ring-1 ring-primary-600'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-base font-bold text-gray-900">{plan.name}</h3>
+                          {isSelected && (
+                            <CheckIcon className="h-5 w-5 text-primary-600" />
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">{plan.description || ''}</p>
+                        <div className="mt-3">
+                          <span className="text-2xl font-bold text-gray-900">
+                            ${plan.price?.toFixed(2) || '0.00'}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-1">
+                            {plan.currency || 'USD'}
+                          </span>
+                        </div>
+                        <div className="mt-3 space-y-1">
+                          <p className="text-xs text-gray-600">
+                            ✓ {plan.durationDays || 30} días de publicación
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            ✓ CVs ilimitados
+                          </p>
+                          {plan.allowedModifications > 0 && (
+                            <p className="text-xs text-gray-600">
+                              ✓ {plan.allowedModifications} modificaciones
+                            </p>
+                          )}
+                          {plan.hasAIFeature && (
+                            <p className="text-xs text-gray-600">
+                              ✓ Generación IA de descripción
+                            </p>
+                          )}
+                          {plan.hasFeaturedOption && (
+                            <p className="text-xs text-gray-600">
+                              ✓ Publicación destacada
+                            </p>
+                          )}
+                          {plan.canModifyCategory && (
+                            <p className="text-xs text-gray-600">
+                              ✓ Cambio de categoría
+                            </p>
+                          )}
+                          {(plan.features || []).map((feature, idx) => (
+                            <p key={idx} className="text-xs text-gray-600">
+                              ✓ {feature}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center">
+                  <ExclamationTriangleIcon className="mx-auto h-10 w-10 text-gray-400" />
+                  <p className="mt-2 text-sm font-medium text-gray-600">No hay planes disponibles</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    No se pudieron cargar los planes. Intenta nuevamente.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={loadPlans}
+                    className="mt-3 rounded-md bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+                  >
+                    Reintentar
+                  </button>
+                </div>
               )}
             </div>
-          </div>
 
-          <div className="rounded-lg bg-white p-6 shadow">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Requisitos</h2>
-            <div>
-              <label htmlFor="requirements" className="block text-sm font-medium text-gray-700">
-                Requisitos *
-              </label>
-              <textarea
-                id="requirements"
-                rows={6}
-                {...register('requirements', { required: 'Los requisitos son requeridos' })}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-              />
-              {errors.requirements && (
-                <p className="mt-1 text-sm text-red-600">{errors.requirements.message}</p>
+            {/* Payment Section */}
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Pagar con PayPal</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Realiza el pago de forma segura con PayPal para publicar tu empleo
+              </p>
+
+              {/* Price Summary */}
+              <div className="mb-6 rounded-lg bg-gray-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {selectedPlan ? selectedPlan.name : 'Publicación de Empleo'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {selectedPlan
+                        ? `${selectedPlan.durationDays} días de publicación`
+                        : 'Publicación estándar'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-gray-900">
+                      ${selectedPlan?.price?.toFixed(2) || createdJob.paymentAmount?.toFixed(2) || '10.00'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {selectedPlan?.currency || createdJob.paymentCurrency || 'USD'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {paymentError && (
+                <div className="mb-4 rounded-lg bg-red-50 p-4">
+                  <div className="flex items-start">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-800">{paymentError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* PayPal Buttons */}
+              {paypalClientId && paypalClientId !== 'YOUR_PAYPAL_CLIENT_ID_HERE' ? (
+                <PayPalScriptProvider
+                  options={{
+                    clientId: paypalClientId,
+                    currency: createdJob.paymentCurrency || 'USD',
+                    intent: 'capture',
+                  }}
+                >
+                  <PayPalButtons
+                    style={{
+                      layout: 'vertical',
+                      color: 'blue',
+                      shape: 'rect',
+                      label: 'pay',
+                      height: 48,
+                    }}
+                    disabled={isLoading || isCreatingOrder}
+                    createOrder={async () => {
+                      return await handleCreatePaypalOrder();
+                    }}
+                    onApprove={async (data) => {
+                      await handlePaypalApprove(data);
+                    }}
+                    onError={handlePaypalError}
+                    onCancel={() => {
+                      toast('Pago cancelado', { icon: '⚠️' });
+                    }}
+                  />
+                </PayPalScriptProvider>
+              ) : (
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
+                    <div className="flex items-start">
+                      <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800">
+                          PayPal no configurado
+                        </p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          Configura <code className="bg-yellow-100 px-1 rounded">NEXT_PUBLIC_PAYPAL_CLIENT_ID</code> en el archivo <code className="bg-yellow-100 px-1 rounded">.env.local</code> para habilitar los pagos con PayPal.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
-          </div>
 
-          <div className="rounded-lg bg-white p-6 shadow">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Beneficios</h2>
-            <div>
-              <label htmlFor="benefits" className="block text-sm font-medium text-gray-700">
-                Beneficios (Opcional)
-              </label>
-              <textarea
-                id="benefits"
-                rows={4}
-                {...register('benefits')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-              />
+            
+          </div>
+        )}
+
+        {/* Step 3: Success */}
+        {step === 'success' && (
+          <div className="rounded-lg bg-white p-12 text-center shadow">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+              <CheckCircleIcon className="h-10 w-10 text-green-600" />
+            </div>
+            <h2 className="mt-6 text-2xl font-bold text-gray-900">
+              {needsPayment ? '¡Pago Realizado!' : '¡Publicación Creada!'}
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {needsPayment
+                ? 'Tu publicación ha sido pagada y publicada exitosamente. Nuestro equipo la revisará para asegurar que cumple con nuestras políticas.'
+                : 'Tu publicación ha sido creada y está siendo revisada. Te notificaremos cuando sea aprobada.'}
+            </p>
+            {createdJob && (
+              <div className="mt-6 rounded-lg bg-gray-50 p-4 text-left inline-block">
+                <p className="text-sm text-gray-600">
+                  <strong>Título:</strong> {createdJob.title}
+                </p>
+              </div>
+            )}
+            <div className="mt-8 flex justify-center gap-4">
+              <button
+                onClick={() => router.push('/publicaciones')}
+                className="rounded-md bg-primary-600 px-6 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+              >
+                Ver Mis Publicaciones
+              </button>
+              <button
+                onClick={() => {
+                  setStep('form');
+                  setCreatedJob(null);
+                  setNeedsPayment(false);
+                  setPaypalOrderId(null);
+                  setPaymentError(null);
+                }}
+                className="rounded-md border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Crear Otra Publicación
+              </button>
             </div>
           </div>
-
-          <div className="flex justify-end gap-4">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading || !canCreate}
-              className="rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
-            >
-              {isLoading ? 'Creando...' : 'Crear Publicación'}
-            </button>
-          </div>
-        </form>
+        )}
       </div>
     </Layout>
   );
 }
-

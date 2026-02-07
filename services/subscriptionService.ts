@@ -18,8 +18,13 @@ class SubscriptionService {
   }
 
   async getPlans(): Promise<Plan[]> {
-    const response = await httpClient.get<{ data: Plan[] }>(API_ENDPOINTS.PLANS.LIST);
-    return response.data;
+    const response = await httpClient.get<{ data: { items: Plan[]; total: number; page: number; pageSize: number; totalPages: number } }>(
+      API_ENDPOINTS.PLANS.LIST
+    );
+    // El backend retorna respuesta paginada { items, total, ... }
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    return data?.items || [];
   }
 }
 

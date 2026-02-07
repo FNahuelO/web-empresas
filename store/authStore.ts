@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User } from '@/types';
+import { User, EmpresaProfile } from '@/types';
 import { httpClient } from '@/lib/httpClient';
 import { API_ENDPOINTS } from '@/lib/api';
 
@@ -20,6 +20,16 @@ interface RegisterData {
   phone?: string;
 }
 
+/** Carga el perfil de empresa y devuelve el companyName, o undefined si falla */
+async function fetchCompanyName(): Promise<string | undefined> {
+  try {
+    const res = await httpClient.get<{ data: EmpresaProfile }>(API_ENDPOINTS.EMPRESAS.PROFILE);
+    return res.data?.companyName;
+  } catch {
+    return undefined;
+  }
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
@@ -30,21 +40,29 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const response = await httpClient.post<{
         data: {
-          user: User;
+          user: { id: string; email: string; tipo: string; verificado: boolean };
           accessToken: string;
           refreshToken: string;
         };
       }>(API_ENDPOINTS.AUTH.LOGIN, { email, password });
 
-      const { user, accessToken, refreshToken } = response.data;
+      const { user: userData, accessToken, refreshToken } = response.data;
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
       }
 
+      // Obtener nombre de empresa
+      const companyName = await fetchCompanyName();
+
       set({
-        user,
+        user: {
+          id: userData.id,
+          email: userData.email,
+          role: userData.tipo?.toUpperCase() as 'EMPRESA' | 'POSTULANTE',
+          companyName,
+        },
         isAuthenticated: true,
         isLoading: false,
       });
@@ -59,13 +77,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const response = await httpClient.post<{
         data: {
-          user: User;
+          user: { id: string; email: string; tipo: string; verificado: boolean };
           accessToken: string;
           refreshToken: string;
         };
       }>(API_ENDPOINTS.AUTH.REGISTER_EMPRESA, data);
 
-      const { user, accessToken, refreshToken } = response.data;
+      const { user: userData, accessToken, refreshToken } = response.data;
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('accessToken', accessToken);
@@ -73,7 +91,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
 
       set({
-        user,
+        user: {
+          id: userData.id,
+          email: userData.email,
+          role: userData.tipo?.toUpperCase() as 'EMPRESA' | 'POSTULANTE',
+          companyName: data.companyName,
+        },
         isAuthenticated: true,
         isLoading: false,
       });
@@ -96,30 +119,55 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   loadUser: async () => {
     if (typeof window === 'undefined') return;
-    
+
     const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
+    const refreshToken = localStorage.getItem('refreshToken');
+
+    // Si no hay ningún token, no hay sesión
+    if (!accessToken && !refreshToken) {
       set({ isAuthenticated: false, user: null });
       return;
     }
 
     set({ isLoading: true });
     try {
-      const response = await httpClient.get<{ data: User }>(API_ENDPOINTS.AUTH.ME);
+      // El interceptor de httpClient se encargará de refrescar el token
+      // automáticamente si el accessToken expiró pero hay refreshToken
+      const [meResponse, companyName] = await Promise.all([
+        httpClient.get<{ data: { userId: string; email: string; userType: string } }>(API_ENDPOINTS.AUTH.ME),
+        fetchCompanyName(),
+      ]);
+
+      const meData = meResponse.data;
+
       set({
-        user: response.data,
+        user: {
+          id: meData.userId,
+          email: meData.email,
+          role: meData.userType as 'EMPRESA' | 'POSTULANTE',
+          companyName,
+        },
         isAuthenticated: true,
         isLoading: false,
       });
     } catch (error) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      set({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-      });
+      // Solo limpiar si realmente no se pudo recuperar la sesión
+      // (el interceptor ya intentó hacer refresh y falló)
+      const stillHasTokens = localStorage.getItem('accessToken') || localStorage.getItem('refreshToken');
+      if (!stillHasTokens) {
+        // El interceptor ya limpió todo y redirigió
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+      } else {
+        // Hubo un error de red u otro tipo, no borrar tokens
+        // El usuario puede reintentar cuando vuelva la conexión
+        set({
+          isLoading: false,
+        });
+      }
     }
   },
 }));
-

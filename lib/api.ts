@@ -21,6 +21,9 @@ export const API_ENDPOINTS = {
     APPLICANTS: (jobId: string) => `/api/empresas/jobs/${jobId}/applicants`,
     UPDATE_APPLICATION: (id: string) => `/api/empresas/applications/${id}`,
     GENERATE_JOB_DESCRIPTION: '/api/empresas/jobs/generate-description',
+    // Pagos por publicación
+    CREATE_JOB_PAYMENT: (jobId: string) => `/api/empresas/jobs/${jobId}/payment/create-order`,
+    CONFIRM_JOB_PAYMENT: (jobId: string) => `/api/empresas/jobs/${jobId}/payment/confirm`,
   },
 
   // Mensajes
@@ -42,6 +45,13 @@ export const API_ENDPOINTS = {
     LIST: '/api/plans',
   },
 
+  // Pagos
+  PAYMENTS: {
+    CREATE_ORDER: '/api/payments/create-order',
+    CAPTURE_ORDER: (orderId: string) => `/api/payments/capture-order/${orderId}`,
+    HISTORY: '/api/payments/history',
+  },
+
   // Catálogos
   CATALOGS: {
     GET: (lang?: string) => `/api/catalogs${lang ? `?lang=${lang}` : ''}`,
@@ -49,4 +59,3 @@ export const API_ENDPOINTS = {
 } as const;
 
 export { API_BASE_URL };
-
