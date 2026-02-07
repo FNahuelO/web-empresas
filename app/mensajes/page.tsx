@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { messageService } from '@/services/messageService';
@@ -53,7 +53,7 @@ function formatTime(dateStr: string): string {
   });
 }
 
-export default function MensajesPage() {
+function MensajesContent() {
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
 
@@ -416,5 +416,21 @@ export default function MensajesPage() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+export default function MensajesPage() {
+  return (
+    <Suspense
+      fallback={
+        <Layout>
+          <div className="flex items-center justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#002D5A] border-t-transparent"></div>
+          </div>
+        </Layout>
+      }
+    >
+      <MensajesContent />
+    </Suspense>
   );
 }
