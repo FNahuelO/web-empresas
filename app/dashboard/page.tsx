@@ -46,18 +46,15 @@ export default function DashboardPage() {
       ]);
 
       setProfile(profileData);
-      // Asegurar que jobsData sea un array
       const jobsArray = Array.isArray(jobsData) ? jobsData : [];
       setJobs(jobsArray);
       setSubscription(subscriptionData);
 
-      // Calcular estadísticas
       const activeJobs = jobsArray.filter(
         (job) => job.status === 'active' || job.status === 'activo'
       );
       setStats((prev) => ({ ...prev, activeJobs: activeJobs.length }));
 
-      // Cargar postulaciones recientes
       const allApplications: Application[] = [];
       let totalApplicants = 0;
       let interviews = 0;
@@ -110,135 +107,76 @@ export default function DashboardPage() {
     );
   }
 
+  const activeJobs = Array.isArray(jobs)
+    ? jobs.filter((job) => job.status === 'active' || job.status === 'activo')
+    : [];
+
   return (
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-              Bienvenido, {profile?.companyName || 'Empresa'}
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Gestiona tus publicaciones y postulantes desde aquí
-            </p>
-          </div>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+            Bienvenido, {profile?.companyName || 'Empresa'}
+          </h1>
           <Link
             href="/publicaciones/nueva"
-            className="flex items-center justify-center gap-2 rounded-lg bg-[#002D5A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#02345fb6] sm:w-auto"
+            className="flex items-center gap-2 rounded-lg bg-[#002D5A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#02345fb6] transition-colors"
           >
-            <PlusIcon className="h-5 w-5" />
-            Nueva Publicación
+            <PlusIcon className="h-4 w-4" />
+            Nueva publicación
           </Link>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <div className="overflow-hidden rounded-lg bg-white shadow">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <BriefcaseIcon className="h-6 w-6 text-primary-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Empleos Activos
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900">{stats.activeJobs}</dd>
-                  </dl>
-                </div>
-              </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50">
+              <BriefcaseIcon className="h-5 w-5 text-[#002D5A]" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Empleos activos</p>
+              <p className="text-xl font-bold text-gray-900">{stats.activeJobs}</p>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-lg bg-white shadow">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <UsersIcon className="h-6 w-6 text-primary-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Postulantes
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900">
-                      {stats.totalApplicants}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
+          <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-green-50">
+              <UsersIcon className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Postulantes</p>
+              <p className="text-xl font-bold text-gray-900">{stats.totalApplicants}</p>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-lg bg-white shadow">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <ChatBubbleLeftRightIcon className="h-6 w-6 text-primary-600" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Entrevistas
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900">{stats.interviews}</dd>
-                  </dl>
-                </div>
-              </div>
+          <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-purple-50">
+              <ChatBubbleLeftRightIcon className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Entrevistas</p>
+              <p className="text-xl font-bold text-gray-900">{stats.interviews}</p>
             </div>
           </div>
         </div>
 
-        {/* Subscription Card */}
-        {subscription && subscription.subscription?.status === 'ACTIVE' && (
-          <div className="overflow-hidden rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 shadow">
-            <div className="p-4 sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-600">Plan Actual</h3>
-                  <p className="mt-1 text-xl font-bold text-gray-900 sm:text-2xl">
-                    {subscription.planType === 'BASIC' && 'Plan Básico'}
-                    {subscription.planType === 'PREMIUM' && 'Plan Premium'}
-                    {subscription.planType === 'ENTERPRISE' && 'Plan Enterprise'}
-                  </p>
-                  {subscription.subscription?.endDate && (
-                    <p className="mt-1 text-sm text-gray-600">
-                      Renueva el{' '}
-                      {new Date(subscription.subscription.endDate).toLocaleDateString('es-ES')}
-                    </p>
-                  )}
-                </div>
-                <Link
-                  href="/planes"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Gestionar
-                </Link>
-              </div>
+        {/* Postulaciones Recientes */}
+        <div>
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">Postulaciones Recientes</h2>
+          {recentApplications.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center">
+              <UsersIcon className="mx-auto h-12 w-12 text-gray-300" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">
+                No hay postulaciones recientes
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Las postulaciones a tus empleos aparecerán aquí
+              </p>
             </div>
-          </div>
-        )}
-
-        {/* Recent Applications */}
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Postulaciones Recientes</h2>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {recentApplications.length === 0 ? (
-              <div className="px-6 py-12 text-center">
-                <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">
-                  No hay postulaciones recientes
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Las postulaciones a tus empleos aparecerán aquí
-                </p>
-              </div>
-            ) : (
-              recentApplications.map((application) => {
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {recentApplications.map((application) => {
                 const postulante = application.postulante;
                 const job = application.job;
                 const fullName =
@@ -247,93 +185,112 @@ export default function DashboardPage() {
                   'Postulante';
 
                 return (
-                  <div key={application.id} className="px-4 py-4 hover:bg-gray-50 sm:px-6">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center space-x-3 sm:space-x-4">
-                        <div className="flex-shrink-0">
-                          {postulante?.avatar || postulante?.profilePicture ? (
-                            <img
-                              className="h-10 w-10 rounded-full"
-                              src={postulante.avatar || postulante.profilePicture}
-                              alt={fullName}
-                            />
-                          ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200">
-                              <UsersIcon className="h-6 w-6 text-gray-400" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{fullName}</p>
-                          <p className="text-sm text-gray-500 truncate">
-                            {job?.title || 'Empleo'}
-                          </p>
-                          {application.appliedAt && (
-                            <p className="text-xs text-gray-400">
-                              {getTimeAgo(new Date(application.appliedAt))}
-                            </p>
-                          )}
-                        </div>
+                  <div
+                    key={application.id}
+                    className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0">
+                        {postulante?.avatar || postulante?.profilePicture ? (
+                          <img
+                            className="h-11 w-11 rounded-full object-cover"
+                            src={postulante.avatar || postulante.profilePicture}
+                            alt={fullName}
+                          />
+                        ) : (
+                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-200">
+                            <UsersIcon className="h-6 w-6 text-gray-400" />
+                          </div>
+                        )}
                       </div>
-                      <Link
-                        href={`/postulantes/${postulante?.id}`}
-                        className="rounded-md bg-[#002D5A] px-3 py-1.5 text-center text-sm font-semibold text-white hover:bg-[#02345fb6] sm:flex-shrink-0"
-                      >
-                        Ver Perfil
-                      </Link>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{fullName}</p>
+                        <p className="text-sm text-gray-500 truncate">
+                          {job?.title || 'Empleo'}
+                        </p>
+                        {application.appliedAt && (
+                          <p className="text-xs text-gray-400">
+                            {getTimeAgo(new Date(application.appliedAt))}
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    <Link
+                      href={`/postulantes/${postulante?.id}`}
+                      className="ml-3 flex-shrink-0 rounded-md bg-[#002D5A] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#02345fb6] transition-colors"
+                    >
+                      Ver perfil
+                    </Link>
                   </div>
                 );
-              })
-            )}
-          </div>
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Active Jobs */}
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="px-4 py-4 border-b border-gray-200 flex items-center justify-between sm:px-6">
+        {/* Empleos Activos */}
+        <div className="rounded-xl border border-gray-200 bg-white">
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h2 className="text-lg font-semibold text-gray-900">Empleos Activos</h2>
             <Link
               href="/publicaciones"
-              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+              className="text-sm font-medium text-[#002D5A] hover:text-[#02345fb6] transition-colors"
             >
               Ver todos
             </Link>
           </div>
-          <div className="divide-y divide-gray-200">
-            {Array.isArray(jobs) && jobs
-              .filter((job) => job.status === 'active' || job.status === 'activo')
-              .slice(0, 5)
-              .map((job) => (
-                <div key={job.id} className="px-4 py-4 hover:bg-gray-50 sm:px-6">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+          <div className="p-6">
+            {activeJobs.length === 0 ? (
+              <div className="py-8 text-center">
+                <BriefcaseIcon className="mx-auto h-12 w-12 text-gray-300" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">
+                  No hay empleos activos
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Crea tu primera publicación para empezar a recibir postulantes
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {activeJobs.slice(0, 6).map((job) => (
+                  <div
+                    key={job.id}
+                    className="rounded-lg border border-gray-100 bg-white p-4 hover:border-gray-200 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
                         {job.title || 'Sin título'}
                       </p>
-                      <p className="text-sm text-gray-500 truncate">
-                        {job.ciudad && job.provincia
-                          ? `${job.ciudad}, ${job.provincia}`
-                          : job.location || 'Ubicación no especificada'}
-                      </p>
+                      <span className="flex flex-shrink-0 items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                        Activo
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500 truncate">
+                      {job.ciudad && job.provincia
+                        ? `${job.ciudad}, ${job.provincia}`
+                        : job.location || 'Ubicación no especificada'}
+                    </p>
+                    <div className="mt-2 flex items-center justify-between">
                       {job.publishedAt && (
                         <p className="text-xs text-gray-400">
                           {getTimeAgo(new Date(job.publishedAt))}
                         </p>
                       )}
+                      <button
+                        onClick={() => {
+                          setSelectedJob(job);
+                          setShowDetailModal(true);
+                        }}
+                        className="text-sm font-medium text-[#002D5A] hover:text-[#02345fb6] transition-colors"
+                      >
+                        Ver detalles
+                      </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        setSelectedJob(job);
-                        setShowDetailModal(true);
-                      }}
-                      className="text-sm font-medium text-primary-600 hover:text-primary-700 sm:flex-shrink-0"
-                    >
-                      Ver detalles
-                    </button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -352,4 +309,3 @@ export default function DashboardPage() {
     </Layout>
   );
 }
-

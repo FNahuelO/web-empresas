@@ -32,3 +32,31 @@ body {
   }
 }
 
+/* Animaciones flotantes para círculos del login */
+@keyframes float-slow {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -25px) scale(1.05); }
+  66% { transform: translate(-20px, 15px) scale(0.95); }
+}
+
+@keyframes float-medium {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-25px, 20px) scale(1.03); }
+  50% { transform: translate(15px, -30px) scale(0.97); }
+  75% { transform: translate(20px, 10px) scale(1.02); }
+}
+
+@keyframes float-fast {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(20px, -20px); }
+}
+
+.animate-float-1 { animation: float-slow 20s ease-in-out infinite; }
+.animate-float-2 { animation: float-medium 25s ease-in-out infinite; }
+.animate-float-3 { animation: float-slow 22s ease-in-out infinite reverse; }
+.animate-float-4 { animation: float-medium 18s ease-in-out infinite; }
+.animate-float-5 { animation: float-fast 15s ease-in-out infinite; }
+.animate-float-6 { animation: float-slow 28s ease-in-out infinite reverse; }
+.animate-float-7 { animation: float-medium 23s ease-in-out infinite; }
+.animate-float-8 { animation: float-fast 19s ease-in-out infinite reverse; }
+

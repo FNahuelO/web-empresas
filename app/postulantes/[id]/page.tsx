@@ -13,7 +13,6 @@ import {
   MapPinIcon,
   BriefcaseIcon,
   AcademicCapIcon,
-  DocumentTextIcon,
   VideoCameraIcon,
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
@@ -145,15 +144,6 @@ export default function PostulanteDetailPage() {
     }
   };
 
-  const getInitials = (name?: string) => {
-    if (!name) return '??';
-    const parts = name.split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
-
   const formatDateRange = (startDate?: string, endDate?: string, isCurrent?: boolean) => {
     if (!startDate) return '';
     const start = new Date(startDate).getFullYear();
@@ -209,352 +199,351 @@ export default function PostulanteDetailPage() {
     postulante.city && postulante.province
       ? `${postulante.city}, ${postulante.province}`
       : postulante.city || postulante.country || null;
-  const jobTitle = application?.job?.title || 'Puesto postulado';
   const status = application?.status || application?.estado;
   const isAccepted = status?.toUpperCase() === 'ACCEPTED';
   const isRejected = status?.toUpperCase() === 'REJECTED';
   const hasCV = !!(postulante.cv || postulante.cvUrl);
-  const hasVideo = !!postulante.videoUrl;
   const avatarUrl = postulante.avatar || postulante.profilePicture;
 
   return (
     <Layout>
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="space-y-6">
         {/* Back Button */}
         <button
           onClick={() => router.back()}
           className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
         >
           <ArrowLeftIcon className="h-4 w-4" />
-          Volver
+          Volver a los candidatos
         </button>
 
-        {/* Header Card - estilo mobile */}
-        <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
-          {/* Banner azul */}
-          {/* Contenido del perfil */}
-          <div className="p-6 bg-gradient-to-r from-[#002D5A] to-[#4C84C3]">
-            <div className="flex flex-col items-center text-center sm:flex-row sm:items-end sm:text-left">
-              {/* Avatar */}
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={fullName}
-                  className="h-24 w-24 rounded-full border-4 border-white object-cover shadow-md"
-                />
-              ) : (
-                <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-[#002D5A] shadow-md">
-                  <span className="text-2xl font-bold text-white">
-                    {getInitials(fullName)}
-                  </span>
-                </div>
-              )}
+        {/* 3-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-6 items-start">
+          {/* ========== LEFT COLUMN ========== */}
+          <div className="space-y-0">
+            {/* Profile Card (dark blue top + white bottom) */}
+            <div className="overflow-hidden rounded-2xl shadow">
+              {/* Dark blue section */}
+              <div className="bg-[#002D5A] px-6 pt-8 pb-6 flex flex-col items-center text-center">
+                {/* Avatar */}
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={fullName}
+                    className="h-20 w-20 rounded-full border-4 border-white/20 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-400">
+                    <UserIcon className="h-10 w-10 text-white" />
+                  </div>
+                )}
 
-              {/* Info */}
-              <div className="mt-3 sm:mt-0 sm:ml-5 sm:pb-1 flex-1">
-                <h1 className="text-2xl font-bold text-white">{fullName}</h1>
+                {/* Name & Info */}
+                <h1 className="mt-4 text-lg font-bold text-white">{fullName}</h1>
                 {postulante.resumeTitle && (
-                  <p className="text-base font-medium text-white">{postulante.resumeTitle}</p>
+                  <p className="mt-1 text-sm text-blue-200">{postulante.resumeTitle}</p>
                 )}
                 {location && (
-                  <p className="mt-1 flex items-center justify-center gap-1 text-sm text-[#D9D9D9] sm:justify-start">
-                    <MapPinIcon className="h-4 w-4" />
-                    {location}
-                  </p>
+                  <p className="mt-1 text-xs text-blue-300">{location}</p>
                 )}
+
+                {/* Action Buttons */}
+                <div className="mt-6 w-full space-y-3">
+                  {/* Contactar */}
+                  {postulante.userId && (
+                    <Link
+                      href={`/mensajes?userId=${postulante.userId}`}
+                      className="flex w-full items-center justify-center gap-2 rounded-full bg-[#1a3f6f] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#254d80] transition-colors"
+                    >
+                      <ChatBubbleLeftRightIcon className="h-4 w-4" />
+                      Contactar
+                    </Link>
+                  )}
+
+                  {/* Aceptar / Cancelar row */}
+                  {application && (
+                    <div className="flex gap-2">
+                      {!isAccepted && (
+                        <button
+                          onClick={() => handleUpdateStatus('ACCEPTED')}
+                          disabled={updatingStatus}
+                          className="flex-1 rounded-full bg-green-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-600 transition-colors disabled:opacity-50"
+                        >
+                          Aceptar
+                        </button>
+                      )}
+                      {!isRejected && (
+                        <button
+                          onClick={() => handleUpdateStatus('REJECTED')}
+                          disabled={updatingStatus}
+                          className="flex-1 rounded-full bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Ver CV */}
+                  {hasCV && (
+                    <button
+                      onClick={handleViewCV}
+                      className="flex w-full items-center justify-center gap-2 rounded-full bg-[#19A23A] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#19A23A]/80 transition-colors"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      Ver CV
+                    </button>
+                  )}
+                  {/* Video de presentación */}
+                  {postulante.videoUrl && (
+                    <button
+                      onClick={() => setShowVideoModal(true)}
+                      className="flex w-full items-center justify-center gap-3 rounded-full bg-[#19A23A] p-3 text-white shadow hover:bg-[#19A23A]/80 transition-colors"
+                    >
+                      <VideoCameraIcon className="h-5 w-5" />
+                      <span className="text-sm font-medium">Video de presentación</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Status badge */}
-              {status && (
-                <div className="mt-3 sm:mt-0">
+              {/* White section - Contact Info */}
+              <div className="bg-white px-6 py-5">
+                <h3 className="text-sm font-bold text-gray-900 mb-4">Información de Contacto</h3>
+                <div className="space-y-4">
+                  {/* Email */}
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100">
+                      <EnvelopeIcon className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Email</p>
+                      <p className="text-sm text-gray-800 break-all">{email}</p>
+                    </div>
+                  </div>
+
+                  {/* Phone */}
+                  {phone && (
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                        <PhoneIcon className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-500">Teléfono</p>
+                        <p className="text-sm text-gray-800">{phone}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Location */}
+                  {location && (
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100">
+                        <MapPinIcon className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-500">Ubicación</p>
+                        <p className="text-sm text-gray-800">{location}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Links */}
+                  {postulante.linkedInUrl && (
+                    <a
+                      href={postulante.linkedInUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 text-blue-600 hover:underline"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                        <LinkIcon className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm">LinkedIn</span>
+                    </a>
+                  )}
+                  {postulante.portfolioUrl && (
+                    <a
+                      href={postulante.portfolioUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 text-blue-600 hover:underline"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-100">
+                        <GlobeAltIcon className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <span className="text-sm">Portfolio</span>
+                    </a>
+                  )}
+                  {postulante.githubUrl && (
+                    <a
+                      href={postulante.githubUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 text-blue-600 hover:underline"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100">
+                        <CodeBracketIcon className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <span className="text-sm">GitHub</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ========== CENTER COLUMN ========== */}
+          <div className="space-y-6">
+            {/* Estado de la Postulación */}
+            {application && (
+              <div className="rounded-2xl bg-white p-6 shadow">
+                <h2 className="text-base font-bold text-gray-900">Estado de la Postulacion</h2>
+                <div className="mt-3 flex items-center justify-between">
                   <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${getStatusColor(status)}`}
+                    className={`inline-flex items-center rounded-full px-4 py-1.5 text-sm font-medium ${getStatusColor(status)}`}
                   >
                     {getStatusLabel(status)}
                   </span>
+                  <button
+                    onClick={() => setShowStatusModal(true)}
+                    disabled={updatingStatus}
+                    className="rounded-full bg-[#002D5A] px-5 py-2 text-sm font-medium text-white hover:bg-[#003d7a] transition-colors disabled:opacity-50"
+                  >
+                    Cambiar estado
+                  </button>
                 </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="mt-6 flex flex-wrap gap-3">
-              {postulante.userId && (
-                <Link
-                  href={`/mensajes?userId=${postulante.userId}`}
-                  className="inline-flex items-center gap-2 rounded-full bg-[#002D5A] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#003d7a] transition-colors"
-                >
-                  <ChatBubbleLeftRightIcon className="h-4 w-4" />
-                  Contactar
-                </Link>
-              )}
-
-              {application && !isAccepted && (
-                <button
-                  onClick={() => handleUpdateStatus('ACCEPTED')}
-                  disabled={updatingStatus}
-                  className="inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                  <CheckCircleIcon className="h-4 w-4" />
-                  Aceptar
-                </button>
-              )}
-
-              {application && !isRejected && (
-                <button
-                  onClick={() => handleUpdateStatus('REJECTED')}
-                  disabled={updatingStatus}
-                  className="inline-flex items-center gap-2 rounded-full bg-red-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-red-600 transition-colors disabled:opacity-50"
-                >
-                  <XCircleIcon className="h-4 w-4" />
-                  Rechazar
-                </button>
-              )}
-
-              <button
-                onClick={() => setShowStatusModal(true)}
-                disabled={updatingStatus}
-                className="inline-flex items-center gap-2 rounded-full border border-white px-5 py-2.5 text-sm font-medium text-white hover:bg-[#002D5A]/5 transition-colors disabled:opacity-50"
-              >
-                Cambiar estado
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* CV y Video */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {hasVideo && (
-            <button
-              onClick={() => setShowVideoModal(true)}
-              className="flex items-center justify-center gap-3 rounded-2xl bg-[#002D5A] p-5 text-white shadow hover:bg-[#003d7a] transition-colors"
-            >
-              <VideoCameraIcon className="h-5 w-5" />
-              <span className="text-sm font-medium">Ver video de presentación</span>
-            </button>
-          )}
-
-          {hasCV && (
-            <button
-              onClick={handleViewCV}
-              className="flex items-center justify-center gap-3 rounded-2xl bg-[#19A23A] p-5 text-white shadow hover:bg-[#148a30] transition-colors"
-            >
-              <ArrowDownTrayIcon className="h-5 w-5" />
-              <span className="text-sm font-medium">Ver CV</span>
-            </button>
-          )}
-        </div>
-
-        {/* Estado de la Postulación */}
-        {application && (
-          <div className="rounded-2xl bg-white p-6 shadow">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">Estado de la Postulación</h2>
-              <span className="text-sm text-gray-500">{jobTitle}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium ${getStatusColor(status)}`}
-              >
-                {getStatusLabel(status)}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Información de Contacto */}
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Información de Contacto</h2>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <EnvelopeIcon className="h-5 w-5 text-gray-400" />
-              <span className="text-sm text-gray-700">{email}</span>
-            </div>
-            {phone && (
-              <div className="flex items-center gap-3">
-                <PhoneIcon className="h-5 w-5 text-gray-400" />
-                <span className="text-sm text-gray-700">{phone}</span>
               </div>
             )}
-            {location && (
-              <div className="flex items-center gap-3">
-                <MapPinIcon className="h-5 w-5 text-gray-400" />
-                <span className="text-sm text-gray-700">{location}</span>
+
+            {/* Sobre el candidato */}
+            {postulante.professionalDescription && (
+              <div className="rounded-2xl bg-white p-6 shadow">
+                <h2 className="text-base font-bold text-gray-900 mb-3">Sobre el candidato</h2>
+                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                  {postulante.professionalDescription}
+                </p>
               </div>
             )}
-            {/* Links */}
-            {postulante.linkedInUrl && (
-              <a
-                href={postulante.linkedInUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 text-blue-600 hover:underline"
-              >
-                <LinkIcon className="h-5 w-5 text-gray-400" />
-                <span className="text-sm">LinkedIn</span>
-              </a>
-            )}
-            {postulante.portfolioUrl && (
-              <a
-                href={postulante.portfolioUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 text-blue-600 hover:underline"
-              >
-                <GlobeAltIcon className="h-5 w-5 text-gray-400" />
-                <span className="text-sm">Portfolio</span>
-              </a>
-            )}
-            {postulante.githubUrl && (
-              <a
-                href={postulante.githubUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 text-blue-600 hover:underline"
-              >
-                <CodeBracketIcon className="h-5 w-5 text-gray-400" />
-                <span className="text-sm">GitHub</span>
-              </a>
-            )}
-          </div>
-        </div>
 
-        {/* Descripción profesional */}
-        {postulante.professionalDescription && (
-          <div className="rounded-2xl bg-white p-6 shadow">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Sobre el candidato</h2>
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-              {postulante.professionalDescription}
-            </p>
-          </div>
-        )}
-
-        {/* Experiencia Laboral */}
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Experiencia Laboral</h2>
-          {postulante.experiences && postulante.experiences.length > 0 ? (
-            <div className="space-y-6">
-              {postulante.experiences.map((exp, index) => (
-                <div key={exp.id || index} className="flex gap-4">
-                  {/* Línea vertical */}
-                  <div className="flex flex-col items-center">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-                      <BriefcaseIcon className="h-4 w-4 text-blue-600" />
+            {/* Experiencia Laboral */}
+            <div className="rounded-2xl bg-white p-6 shadow">
+              <h2 className="text-base font-bold text-gray-900 mb-5">Experiencia laboral</h2>
+              {postulante.experiences && postulante.experiences.length > 0 ? (
+                <div className="space-y-6">
+                  {postulante.experiences.map((exp, index) => (
+                    <div key={exp.id || index} className="flex gap-4">
+                      {/* Icon */}
+                      <div className="flex flex-col items-center">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                          <BriefcaseIcon className="h-5 w-5 text-blue-600" />
+                        </div>
+                        {index < (postulante.experiences?.length || 0) - 1 && (
+                          <div className="mt-2 h-full w-px bg-gray-200" />
+                        )}
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 pb-2">
+                        <h3 className="text-sm font-bold text-gray-900">{exp.position}</h3>
+                        <p className="text-sm font-medium text-green-600">{exp.company}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {formatDateRange(exp.startDate, exp.endDate, exp.isCurrent)}
+                        </p>
+                        {exp.description && (
+                          <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                            {exp.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {index < (postulante.experiences?.length || 0) - 1 && (
-                      <div className="mt-2 h-full w-px bg-gray-200" />
-                    )}
-                  </div>
-                  {/* Contenido */}
-                  <div className="flex-1 pb-2">
-                    <h3 className="text-base font-semibold text-gray-900">{exp.position}</h3>
-                    <p className="text-sm font-medium text-blue-600">{exp.company}</p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {formatDateRange(exp.startDate, exp.endDate, exp.isCurrent)}
-                    </p>
-                    {exp.description && (
-                      <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-                        {exp.description}
-                      </p>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <div className="flex flex-col items-center py-8 text-center">
+                  <BriefcaseIcon className="h-12 w-12 text-gray-300" />
+                  <p className="mt-3 text-sm font-medium text-gray-500">Sin experiencia registrada</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    El candidato no ha cargado experiencia laboral
+                  </p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="flex flex-col items-center py-8 text-center">
-              <BriefcaseIcon className="h-12 w-12 text-gray-300" />
-              <p className="mt-3 text-sm font-medium text-gray-500">Sin experiencia registrada</p>
-              <p className="mt-1 text-xs text-gray-400">
-                El candidato no ha cargado experiencia laboral
-              </p>
-            </div>
-          )}
-        </div>
 
-        {/* Educación */}
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Educación</h2>
-          {postulante.education && postulante.education.length > 0 ? (
-            <div className="space-y-6">
-              {postulante.education.map((edu, index) => (
-                <div key={edu.id || index} className="flex gap-4">
-                  {/* Línea vertical */}
-                  <div className="flex flex-col items-center">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100">
-                      <AcademicCapIcon className="h-4 w-4 text-purple-600" />
+            {/* Idiomas (in center if exists) */}
+            {postulante.languages && postulante.languages.length > 0 && (
+              <div className="rounded-2xl bg-white p-6 shadow">
+                <h2 className="text-base font-bold text-gray-900 mb-4">Idiomas</h2>
+                <div className="space-y-3">
+                  {postulante.languages.map((lang, index) => (
+                    <div key={index} className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
+                      <span className="text-sm font-medium text-gray-900">{lang.language}</span>
+                      <span className="text-xs rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700 capitalize">
+                        {lang.level}
+                      </span>
                     </div>
-                    {index < (postulante.education?.length || 0) - 1 && (
-                      <div className="mt-2 h-full w-px bg-gray-200" />
-                    )}
-                  </div>
-                  {/* Contenido */}
-                  <div className="flex-1 pb-2">
-                    <h3 className="text-base font-semibold text-gray-900">{edu.degree}</h3>
-                    <p className="text-sm font-medium text-blue-600">{edu.institution}</p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {formatDateRange(edu.startDate, edu.endDate, edu.isCurrent)}
-                    </p>
-                    {edu.description && (
-                      <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-                        {edu.description}
-                      </p>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center py-8 text-center">
-              <AcademicCapIcon className="h-12 w-12 text-gray-300" />
-              <p className="mt-3 text-sm font-medium text-gray-500">Sin educación registrada</p>
-              <p className="mt-1 text-xs text-gray-400">
-                El candidato no ha cargado su formación académica
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Habilidades */}
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Habilidades</h2>
-          {postulante.skills && postulante.skills.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {postulante.skills.map((skill, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center rounded-full bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center py-8 text-center">
-              <StarIcon className="h-12 w-12 text-gray-300" />
-              <p className="mt-3 text-sm font-medium text-gray-500">Sin habilidades registradas</p>
-              <p className="mt-1 text-xs text-gray-400">
-                El candidato no ha cargado sus habilidades
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Idiomas */}
-        {postulante.languages && postulante.languages.length > 0 && (
-          <div className="rounded-2xl bg-white p-6 shadow">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Idiomas</h2>
-            <div className="space-y-3">
-              {postulante.languages.map((lang, index) => (
-                <div key={index} className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
-                  <span className="text-sm font-medium text-gray-900">{lang.language}</span>
-                  <span className="text-xs rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700 capitalize">
-                    {lang.level}
-                  </span>
-                </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* ========== RIGHT COLUMN ========== */}
+          <div className="space-y-6">
+            {/* Educación */}
+            <div className="rounded-2xl bg-white p-6 shadow">
+              <h2 className="text-base font-bold text-gray-900 mb-5">Educación</h2>
+              {postulante.education && postulante.education.length > 0 ? (
+                <div className="space-y-5">
+                  {postulante.education.map((edu, index) => (
+                    <div key={edu.id || index} className="flex gap-3">
+                      {/* Vertical bar indicator */}
+                      <div className="flex flex-col items-center">
+                        <div className="w-2 h-full min-h-[48px] rounded-full bg-[#002D5A]" />
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1">
+                        <h3 className="text-sm font-bold text-gray-900">{edu.degree}</h3>
+                        <p className="text-sm font-medium text-green-600">{edu.institution}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {formatDateRange(edu.startDate, edu.endDate, edu.isCurrent)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center py-6 text-center">
+                  <AcademicCapIcon className="h-10 w-10 text-gray-300" />
+                  <p className="mt-3 text-sm font-medium text-gray-500">Sin educación registrada</p>
+                </div>
+              )}
+            </div>
+
+            {/* Habilidades */}
+            <div className="rounded-2xl bg-white p-6 shadow">
+              <h2 className="text-base font-bold text-gray-900 mb-4">Habilidades</h2>
+              {postulante.skills && postulante.skills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {postulante.skills.map((skill, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center py-6 text-center">
+                  <StarIcon className="h-10 w-10 text-gray-300" />
+                  <p className="mt-3 text-sm font-medium text-gray-500">Sin habilidades registradas</p>
+                </div>
+              )}
+            </div>
+
+
+          </div>
+        </div>
       </div>
 
       {/* Modal Cambiar Estado */}
@@ -579,18 +568,16 @@ export default function PostulanteDetailPage() {
                       key={statusOption}
                       onClick={() => handleUpdateStatus(statusOption)}
                       disabled={updatingStatus || isCurrent}
-                      className={`flex w-full items-center justify-between rounded-lg border-2 p-4 transition-colors ${
-                        isCurrent
-                          ? 'border-[#002D5A] bg-[#002D5A]/5'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      } ${updatingStatus || isCurrent ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`flex w-full items-center justify-between rounded-lg border-2 p-4 transition-colors ${isCurrent
+                        ? 'border-[#002D5A] bg-[#002D5A]/5'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        } ${updatingStatus || isCurrent ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <div className="flex items-center gap-3">
                         {getStatusIcon(statusOption)}
                         <span
-                          className={`text-sm font-medium ${
-                            isCurrent ? 'text-[#002D5A]' : 'text-gray-800'
-                          }`}
+                          className={`text-sm font-medium ${isCurrent ? 'text-[#002D5A]' : 'text-gray-800'
+                            }`}
                         >
                           {getStatusLabel(statusOption)}
                         </span>
@@ -636,4 +623,3 @@ export default function PostulanteDetailPage() {
     </Layout>
   );
 }
-
