@@ -6,6 +6,27 @@ import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
 
+function parseFriendlyError(message: unknown): string {
+  const fallback = 'Error al iniciar sesión';
+
+  if (!message) return fallback;
+
+  const raw = Array.isArray(message) ? message[0] : String(message);
+  if (!raw) return fallback;
+
+  const key = raw.split('|')[0]; // e.g. "validation.isEmail"
+
+  const friendlyMessages: Record<string, string> = {
+    'validation.isEmail': 'Ingresá un email válido',
+    'validation.isNotEmpty': 'Completá todos los campos',
+    'validation.isString': 'El valor ingresado no es válido',
+    'validation.minLength': 'El valor ingresado es demasiado corto',
+    'validation.maxLength': 'El valor ingresado es demasiado largo',
+  };
+
+  return friendlyMessages[key] || fallback;
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,7 +43,13 @@ export default function LoginPage() {
       toast.success('Inicio de sesión exitoso');
       router.push('/dashboard');
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Error al iniciar sesión');
+      const status = error?.response?.status;
+      if (status === 401) {
+        toast.error('Email o contraseña incorrectos');
+      } else {
+        const apiMessage = error?.response?.data?.message;
+        toast.error(parseFriendlyError(apiMessage));
+      }
     } finally {
       setIsLoading(false);
     }

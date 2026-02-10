@@ -193,11 +193,15 @@ class HttpClient {
       async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-        // Solo intentar refresh en 401 que no sea el propio endpoint de refresh
+        // Solo intentar refresh en 401 que no sea un endpoint de auth
+        const isAuthEndpoint =
+          originalRequest.url?.includes('/api/auth/login') ||
+          originalRequest.url?.includes('/api/auth/refresh');
+
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
-          !originalRequest.url?.includes('/api/auth/refresh')
+          !isAuthEndpoint
         ) {
           originalRequest._retry = true;
 
