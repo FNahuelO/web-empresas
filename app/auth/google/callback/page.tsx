@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { videoMeetingService } from '@/services/videoMeetingService';
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
-export default function GoogleCalendarCallbackPage() {
+function GoogleCalendarCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -110,3 +110,21 @@ export default function GoogleCalendarCallbackPage() {
   );
 }
 
+function LoadingFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg text-center">
+        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
+        <h2 className="mt-4 text-lg font-bold text-gray-900">Cargando...</h2>
+      </div>
+    </div>
+  );
+}
+
+export default function GoogleCalendarCallbackPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <GoogleCalendarCallbackContent />
+    </Suspense>
+  );
+}
