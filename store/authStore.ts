@@ -14,10 +14,31 @@ interface AuthState {
 }
 
 interface RegisterData {
+  // Información de la empresa
+  companyName: string;
+  razonSocial: string;
+  condicionFiscal: string;
+  documento: string;
+  cuit?: string;
+  provincia: string;
+  localidad: string;
+  ciudad: string;
+  calle: string;
+  numero: string;
+  codigoPostal: string;
+  phoneCountryCode: string;
+  telefono: string;
+  industria: string;
+  cantidadEmpleados: string;
+  contribuyenteIngresosBrutos: boolean;
+  // Información del usuario
+  nombre: string;
+  apellido: string;
   email: string;
   password: string;
-  companyName: string;
-  phone?: string;
+  passwordConfirm: string;
+  // Términos
+  aceptaTerminos: boolean;
 }
 
 /** Carga el perfil de empresa y devuelve el companyName, o undefined si falla */

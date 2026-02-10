@@ -8,6 +8,9 @@ export const API_ENDPOINTS = {
     LOGOUT: '/api/auth/logout',
     REFRESH_TOKEN: '/api/auth/refresh',
     ME: '/api/auth/me',
+    FORGOT_PASSWORD: '/api/auth/forgot-password',
+    RESET_PASSWORD: '/api/auth/reset-password',
+    RESEND_VERIFICATION: '/api/auth/resend-verification',
   },
 
   // Empresas
@@ -78,6 +81,12 @@ export const API_ENDPOINTS = {
   // Catálogos
   CATALOGS: {
     GET: (lang?: string) => `/api/catalogs${lang ? `?lang=${lang}` : ''}`,
+  },
+
+  // Opciones (sectores, tamaños de empresa, etc.)
+  OPTIONS: {
+    GET: (category: string, lang?: string) =>
+      `/api/options/${category}${lang ? `?lang=${lang}` : ''}`,
   },
 } as const;
 
