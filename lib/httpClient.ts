@@ -193,15 +193,22 @@ class HttpClient {
       async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-        // Solo intentar refresh en 401 que no sea un endpoint de auth
-        const isAuthEndpoint =
+        // Solo intentar refresh en 401 que no sea un endpoint público de auth
+        // Estos endpoints son públicos y pueden devolver 401 sin que signifique
+        // que el token expiró (ej: verify-email con token inválido)
+        const isPublicAuthEndpoint =
           originalRequest.url?.includes('/api/auth/login') ||
-          originalRequest.url?.includes('/api/auth/refresh');
+          originalRequest.url?.includes('/api/auth/refresh') ||
+          originalRequest.url?.includes('/api/auth/register') ||
+          originalRequest.url?.includes('/api/auth/verify-email') ||
+          originalRequest.url?.includes('/api/auth/resend-verification') ||
+          originalRequest.url?.includes('/api/auth/forgot-password') ||
+          originalRequest.url?.includes('/api/auth/reset-password');
 
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
-          !isAuthEndpoint
+          !isPublicAuthEndpoint
         ) {
           originalRequest._retry = true;
 

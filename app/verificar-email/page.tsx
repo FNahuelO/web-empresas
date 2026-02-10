@@ -5,6 +5,8 @@ import { Suspense, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { httpClient } from '@/lib/httpClient';
+import { API_ENDPOINTS } from '@/lib/api';
+import toast from 'react-hot-toast';
 
 type VerifyState = 'loading' | 'success' | 'already_verified' | 'error' | 'no_token';
 
@@ -16,6 +18,9 @@ function VerifyEmailContent() {
     const [state, setState] = useState<VerifyState>(token ? 'loading' : 'no_token');
     const [message, setMessage] = useState('');
     const [countdown, setCountdown] = useState(5);
+    const [resendEmail, setResendEmail] = useState('');
+    const [showResendForm, setShowResendForm] = useState(false);
+    const [resending, setResending] = useState(false);
 
     // Verificar automáticamente cuando hay token
     useEffect(() => {
@@ -184,15 +189,71 @@ function VerifyEmailContent() {
                             <h1 className="text-2xl font-bold text-secondary-900 mb-2">
                                 Error de verificación
                             </h1>
-                            <p className="text-gray-500 mb-6">
+                            <p className="text-gray-500 mb-4">
                                 {message}
                             </p>
-                            <Link
-                                href="/login"
-                                className="inline-block w-full rounded-full bg-secondary-900 px-6 py-3 text-sm font-semibold text-white hover:bg-secondary-800 transition-colors"
-                            >
-                                Ir al login
-                            </Link>
+
+                            {/* Formulario para reenviar email de verificación */}
+                            {!showResendForm ? (
+                                <div className="flex flex-col gap-3">
+                                    <button
+                                        onClick={() => setShowResendForm(true)}
+                                        className="w-full rounded-full bg-primary-500 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-600 transition-colors"
+                                    >
+                                        Reenviar email de verificación
+                                    </button>
+                                    <Link
+                                        href="/login"
+                                        className="inline-block w-full rounded-full bg-secondary-900 px-6 py-3 text-sm font-semibold text-white hover:bg-secondary-800 transition-colors text-center"
+                                    >
+                                        Ir al login
+                                    </Link>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    <p className="text-sm text-gray-500 mb-1">
+                                        Ingresá tu email para recibir un nuevo enlace de verificación:
+                                    </p>
+                                    <input
+                                        type="email"
+                                        value={resendEmail}
+                                        onChange={(e) => setResendEmail(e.target.value)}
+                                        placeholder="tu@empresa.com"
+                                        className="block w-full rounded-md border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-sm"
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            if (!resendEmail.trim()) {
+                                                toast.error('Ingresá tu email');
+                                                return;
+                                            }
+                                            setResending(true);
+                                            try {
+                                                await httpClient.post(API_ENDPOINTS.AUTH.RESEND_VERIFICATION, {
+                                                    email: resendEmail.trim().toLowerCase(),
+                                                });
+                                                toast.success('Email de verificación reenviado. Revisá tu bandeja de entrada.');
+                                                setShowResendForm(false);
+                                            } catch (err: any) {
+                                                const errMsg = err?.response?.data?.message || 'Error al reenviar el email';
+                                                toast.error(typeof errMsg === 'string' ? errMsg : 'Error al reenviar el email');
+                                            } finally {
+                                                setResending(false);
+                                            }
+                                        }}
+                                        disabled={resending}
+                                        className="w-full rounded-full bg-primary-500 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-50 transition-colors"
+                                    >
+                                        {resending ? 'Reenviando...' : 'Enviar nuevo enlace'}
+                                    </button>
+                                    <Link
+                                        href="/login"
+                                        className="inline-block w-full rounded-full border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors text-center"
+                                    >
+                                        Ir al login
+                                    </Link>
+                                </div>
+                            )}
                         </>
                     )}
 
