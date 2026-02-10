@@ -29,20 +29,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-white via-white via-80% to-[#6092cc]">
-      {/* Fondo completo - cubre toda la pantalla */}
-      <div className="absolute inset-0">
-        <div className="absolute -bottom-24 -left-24 w-[420px] h-[420px] rounded-full bg-teal-200/50 animate-float-1" />
-        <div className="absolute -bottom-8 left-16 w-[320px] h-[320px] rounded-full bg-cyan-200/30 animate-float-2" />
-        <div className="absolute -bottom-20 right-[30%] w-[280px] h-[280px] rounded-full bg-teal-100/40 animate-float-3" />
-        <div className="absolute -top-16 -left-16 w-[300px] h-[300px] rounded-full bg-cyan-100/20 animate-float-4" />
-        <div className="absolute -top-20 right-[10%] w-[350px] h-[350px] rounded-full bg-teal-100/25 animate-float-5" />
-        <div className="absolute top-[40%] -right-16 w-[280px] h-[280px] rounded-full bg-cyan-100/20 animate-float-6" />
-        <div className="absolute top-[30%] left-[15%] w-[200px] h-[200px] rounded-full bg-teal-100/20 animate-float-7" />
-        <div className="absolute -bottom-16 -right-16 w-[350px] h-[350px] rounded-full bg-teal-200/30 animate-float-8" />
+    <div className="relative h-screen overflow-hidden bg-white">
+      {/* Brillo de fondo - degradado suave */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white via-white via-70% to-[#6092cc]/10" />
+
+      {/* Círculos decorativos - por detrás de todo */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute -bottom-24 -left-24 w-[420px] h-[420px] rounded-full bg-teal-200/20 animate-float-1" />
+        <div className="absolute -bottom-8 left-16 w-[320px] h-[320px] rounded-full bg-cyan-200/15 animate-float-2" />
+        <div className="absolute -bottom-20 right-[30%] w-[280px] h-[280px] rounded-full bg-teal-100/15 animate-float-3" />
+        <div className="absolute -top-16 -left-16 w-[300px] h-[300px] rounded-full bg-cyan-100/10 animate-float-4" />
+        <div className="absolute -top-20 right-[10%] w-[350px] h-[350px] rounded-full bg-teal-100/10 animate-float-5" />
+        <div className="absolute top-[40%] -right-16 w-[280px] h-[280px] rounded-full bg-cyan-100/10 animate-float-6" />
+        <div className="absolute top-[30%] left-[15%] w-[200px] h-[200px] rounded-full bg-teal-100/10 animate-float-7" />
+        <div className="absolute -bottom-16 -right-16 w-[350px] h-[350px] rounded-full bg-teal-200/15 animate-float-8" />
       </div>
 
-      {/* Branding izquierdo - sobre el fondo */}
+      {/* Branding izquierdo */}
       <div className="hidden lg:flex absolute inset-y-0 left-0 w-[40%] items-center justify-center px-12 z-10">
         <div className="text-left">
           <h1 className="text-5xl font-bold tracking-tight">
@@ -55,9 +58,9 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Tarjeta del formulario - flota encima del fondo */}
-      <div className="relative z-20 min-h-screen flex items-center justify-center lg:justify-end lg:pr-[17%] px-4 py-12">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl px-10 py-12">
+      {/* Tarjeta del formulario - por encima de los círculos */}
+      <div className="relative z-20 h-full flex items-stretch justify-center lg:justify-end lg:pr-[17%]">
+        <div className="w-full max-w-md flex flex-col justify-center bg-white shadow-xl px-10 gap-10">
           {/* Icono + nombre */}
           <div className="flex flex-col items-center mb-5">
             <Image

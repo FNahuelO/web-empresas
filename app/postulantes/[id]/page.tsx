@@ -224,7 +224,7 @@ export default function PostulanteDetailPage() {
             {/* Profile Card (dark blue top + white bottom) */}
             <div className="overflow-hidden rounded-2xl shadow">
               {/* Dark blue section */}
-              <div className="bg-[#002D5A] px-6 pt-8 pb-6 flex flex-col items-center text-center">
+              <div className="bg-[#224160] px-6 pt-8 pb-6 flex flex-col items-center text-center">
                 {/* Avatar */}
                 {avatarUrl ? (
                   <img
@@ -253,7 +253,7 @@ export default function PostulanteDetailPage() {
                   {postulante.userId && (
                     <Link
                       href={`/mensajes?userId=${postulante.userId}`}
-                      className="flex w-full items-center justify-center gap-2 rounded-full bg-[#1a3f6f] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#254d80] transition-colors"
+                      className="flex w-full items-center justify-center gap-2 rounded-full bg-[#002D5A] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#254d80] transition-colors"
                     >
                       <ChatBubbleLeftRightIcon className="h-4 w-4" />
                       Contactar
@@ -503,7 +503,7 @@ export default function PostulanteDetailPage() {
                       {/* Content */}
                       <div className="flex-1">
                         <h3 className="text-sm font-bold text-gray-900">{edu.degree}</h3>
-                        <p className="text-sm font-medium text-green-600">{edu.institution}</p>
+                        <p className="text-sm font-medium text-[#4C84C3]">{edu.institution}</p>
                         <p className="mt-0.5 text-xs text-gray-400">
                           {formatDateRange(edu.startDate, edu.endDate, edu.isCurrent)}
                         </p>
@@ -527,7 +527,7 @@ export default function PostulanteDetailPage() {
                   {postulante.skills.map((skill, index) => (
                     <span
                       key={index}
-                      className="inline-flex items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700"
+                      className="inline-flex items-center rounded-lg bg-[#F0FDF4] px-4 py-2 text-sm font-medium text-[#158043]"
                     >
                       {skill}
                     </span>
