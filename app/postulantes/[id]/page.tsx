@@ -27,6 +27,8 @@ import {
 import { StarIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import ScheduleVideoMeetingModal from '@/components/ScheduleVideoMeetingModal';
+import Avatar from '@/components/Avatar';
 
 export default function PostulanteDetailPage() {
   const params = useParams();
@@ -39,6 +41,7 @@ export default function PostulanteDetailPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showScheduleMeetingModal, setShowScheduleMeetingModal] = useState(false);
 
   useEffect(() => {
     if (postulanteId) {
@@ -226,17 +229,12 @@ export default function PostulanteDetailPage() {
               {/* Dark blue section */}
               <div className="bg-[#224160] px-6 pt-8 pb-6 flex flex-col items-center text-center">
                 {/* Avatar */}
-                {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt={fullName}
-                    className="h-20 w-20 rounded-full border-4 border-white/20 object-cover"
-                  />
-                ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-400">
-                    <UserIcon className="h-10 w-10 text-white" />
-                  </div>
-                )}
+                <Avatar
+                  src={avatarUrl}
+                  alt={fullName}
+                  size="xl"
+                  className="border-4 border-white/20"
+                />
 
                 {/* Name & Info */}
                 <h1 className="mt-4 text-lg font-bold text-white">{fullName}</h1>
@@ -294,6 +292,17 @@ export default function PostulanteDetailPage() {
                       Ver CV
                     </button>
                   )}
+                  {/* Agendar videollamada */}
+                  {postulante.userId && (
+                    <button
+                      onClick={() => setShowScheduleMeetingModal(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                    >
+                      <VideoCameraIcon className="h-4 w-4" />
+                      Agendar videollamada
+                    </button>
+                  )}
+
                   {/* Video de presentación */}
                   {postulante.videoUrl && (
                     <button
@@ -619,6 +628,16 @@ export default function PostulanteDetailPage() {
             />
           </div>
         </div>
+      )}
+
+      {/* Modal Agendar Videollamada */}
+      {postulante.userId && (
+        <ScheduleVideoMeetingModal
+          isOpen={showScheduleMeetingModal}
+          onClose={() => setShowScheduleMeetingModal(false)}
+          invitedUserId={postulante.userId}
+          invitedUserName={fullName}
+        />
       )}
     </Layout>
   );

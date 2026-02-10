@@ -11,6 +11,7 @@ import {
   CreditCardIcon,
   ArrowRightOnRectangleIcon,
   XMarkIcon,
+  VideoCameraIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
@@ -20,6 +21,7 @@ const navigation = [
   { name: 'Publicaciones', href: '/publicaciones', icon: BriefcaseIcon },
   { name: 'Postulantes', href: '/postulantes', icon: UsersIcon },
   { name: 'Mensajes', href: '/mensajes', icon: ChatBubbleLeftRightIcon },
+  { name: 'Videollamadas', href: '/videollamadas', icon: VideoCameraIcon },
   { name: 'Planes', href: '/planes', icon: CreditCardIcon },
   { name: 'Configuración', href: '/configuracion', icon: Cog6ToothIcon },
 ];
@@ -80,8 +82,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 href={item.href}
                 onClick={handleNavClick}
                 className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium ${isActive
-                    ? 'bg-primary-600 text-white'
-                    : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
+                  ? 'bg-primary-600 text-white'
+                  : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
                   }`}
               >
                 <item.icon

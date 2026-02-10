@@ -210,3 +210,46 @@ export interface Conversation {
   lastMessage: Message;
   unreadCount: number;
 }
+
+// Video Meetings
+export type VideoMeetingStatus =
+  | 'SCHEDULED'
+  | 'ACCEPTED'
+  | 'REJECTED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'MISSED';
+
+export interface VideoMeeting {
+  id: string;
+  createdById: string;
+  invitedUserId: string;
+  title?: string;
+  description?: string;
+  scheduledAt: string;
+  duration?: number;
+  status: VideoMeetingStatus;
+  meetingUrl?: string;
+  callId?: string;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  endedAt?: string;
+}
+
+export interface CreateVideoMeetingRequest {
+  invitedUserId: string;
+  title?: string;
+  description?: string;
+  scheduledAt: string;
+  duration?: number;
+}
+
+export interface UpdateVideoMeetingRequest {
+  title?: string;
+  description?: string;
+  scheduledAt?: string;
+  duration?: number;
+  meetingUrl?: string;
+}

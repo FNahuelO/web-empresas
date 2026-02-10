@@ -13,6 +13,7 @@ import {
   CheckIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import Avatar from '@/components/Avatar';
 
 /** Extrae el nombre legible de un ApiUserInfo */
 function getUserName(user?: ApiUserInfo | null): string {
@@ -215,19 +216,11 @@ function MensajesContent() {
                     >
                       {/* Avatar */}
                       <div className="flex-shrink-0">
-                        {avatarUrl ? (
-                          <img
-                            className="h-11 w-11 rounded-full object-cover"
-                            src={avatarUrl}
-                            alt={userName}
-                          />
-                        ) : (
-                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#002D5A]">
-                            <span className="text-sm font-semibold text-white">
-                              {userName.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
+                        <Avatar
+                          src={avatarUrl}
+                          alt={userName}
+                          size="md"
+                        />
                       </div>
 
                       {/* Info */}
@@ -279,19 +272,11 @@ function MensajesContent() {
                   </button>
 
                   {/* Avatar */}
-                  {getUserAvatar(selectedUserInfo) ? (
-                    <img
-                      className="h-9 w-9 rounded-full object-cover"
-                      src={getUserAvatar(selectedUserInfo)!}
-                      alt={getUserName(selectedUserInfo)}
-                    />
-                  ) : (
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#002D5A]">
-                      <span className="text-xs font-semibold text-white">
-                        {getUserName(selectedUserInfo).charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
+                  <Avatar
+                    src={getUserAvatar(selectedUserInfo)}
+                    alt={getUserName(selectedUserInfo)}
+                    size="sm"
+                  />
 
                   <div>
                     <h2 className="text-sm font-semibold text-gray-900">

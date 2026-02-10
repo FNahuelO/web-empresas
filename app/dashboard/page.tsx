@@ -17,6 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import JobDetailModal from '@/components/JobDetailModal';
+import Avatar from '@/components/Avatar';
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<EmpresaProfile | null>(null);
@@ -191,17 +192,11 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex-shrink-0">
-                        {postulante?.avatar || postulante?.profilePicture ? (
-                          <img
-                            className="h-11 w-11 rounded-full object-cover"
-                            src={postulante.avatar || postulante.profilePicture}
-                            alt={fullName}
-                          />
-                        ) : (
-                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-200">
-                            <UsersIcon className="h-6 w-6 text-gray-400" />
-                          </div>
-                        )}
+                        <Avatar
+                          src={postulante?.avatar || postulante?.profilePicture}
+                          alt={fullName}
+                          size="md"
+                        />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">{fullName}</p>

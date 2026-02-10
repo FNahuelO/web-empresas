@@ -52,6 +52,29 @@ export const API_ENDPOINTS = {
     HISTORY: '/api/payments/history',
   },
 
+  // Video Meetings
+  VIDEO_MEETINGS: {
+    LIST: '/api/video-meetings',
+    CREATE: '/api/video-meetings',
+    GET: (id: string) => `/api/video-meetings/${id}`,
+    UPDATE: (id: string) => `/api/video-meetings/${id}`,
+    ACCEPT: (id: string) => `/api/video-meetings/${id}/accept`,
+    REJECT: (id: string) => `/api/video-meetings/${id}/reject`,
+    CANCEL: (id: string) => `/api/video-meetings/${id}/cancel`,
+    START: (id: string) => `/api/video-meetings/${id}/start`,
+    COMPLETE: (id: string) => `/api/video-meetings/${id}/complete`,
+    ICS: (id: string) => `/api/video-meetings/${id}/ics`,
+  },
+
+  // Google Meet / Calendar
+  GOOGLE_MEET: {
+    AUTH_URL: '/api/google-meet/auth-url',
+    AUTHORIZE: '/api/google-meet/authorize',
+    REFRESH_TOKEN: '/api/google-meet/refresh-token',
+    STATUS: '/api/google-meet/status',
+    DISCONNECT: '/api/google-meet/disconnect',
+  },
+
   // Catálogos
   CATALOGS: {
     GET: (lang?: string) => `/api/catalogs${lang ? `?lang=${lang}` : ''}`,

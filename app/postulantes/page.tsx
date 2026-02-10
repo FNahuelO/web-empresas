@@ -7,6 +7,7 @@ import { jobService } from '@/services/jobService';
 import { Application, Job } from '@/types';
 import { UsersIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import Avatar from '@/components/Avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -138,17 +139,11 @@ function PostulantesContent() {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
                         <div className="flex-shrink-0">
-                          {postulante?.avatar || postulante?.profilePicture ? (
-                            <img
-                              className="h-10 w-10 rounded-full sm:h-12 sm:w-12"
-                              src={postulante.avatar || postulante.profilePicture}
-                              alt={fullName}
-                            />
-                          ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 sm:h-12 sm:w-12">
-                              <UsersIcon className="h-5 w-5 text-gray-400 sm:h-6 sm:w-6" />
-                            </div>
-                          )}
+                          <Avatar
+                            src={postulante?.avatar || postulante?.profilePicture}
+                            alt={fullName}
+                            size="lg"
+                          />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-base font-semibold text-gray-900 truncate sm:text-lg">{fullName}</h3>
