@@ -70,17 +70,21 @@ function MensajesContent() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Cargar conversaciones
-  const loadConversations = useCallback(async () => {
+  // showLoader: solo mostrar spinner en la carga inicial, no al refrescar en background
+  const loadConversations = useCallback(async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       const data = await messageService.getConversations();
       setConversations(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      toast.error('Error al cargar conversaciones');
+      // Solo mostrar error si es la carga inicial
+      if (showLoader) {
+        toast.error('Error al cargar conversaciones');
+      }
       console.error(error);
-      setConversations([]);
+      if (showLoader) setConversations([]);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   }, []);
 
@@ -139,9 +143,22 @@ function MensajesContent() {
 
     try {
       const sentMessage = await messageService.sendMessage(selectedUserId, messageText);
+      // Agregar el mensaje nuevo a la lista sin recargar toda la página
       setMessages((prev) => [...prev, sentMessage]);
-      // Recargar conversaciones para actualizar el último mensaje
-      loadConversations();
+
+      // Actualizar la lista de conversaciones localmente (mover al tope con el último mensaje)
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.user?.id === selectedUserId);
+        if (idx !== -1) {
+          const updated = { ...prev[idx], lastMessage: sentMessage };
+          const rest = prev.filter((_, i) => i !== idx);
+          return [updated, ...rest];
+        }
+        return prev;
+      });
+
+      // Recargar conversaciones en background (sin spinner) para sincronizar
+      loadConversations(false);
       inputRef.current?.focus();
     } catch (error: any) {
       toast.error('Error al enviar el mensaje');

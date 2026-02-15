@@ -15,6 +15,8 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   LockClosedIcon,
+  ClockIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -94,7 +96,12 @@ export default function PublicacionesPage() {
     }
   };
 
-  const getStatusColor = (status: string, moderationStatus?: string, paymentStatus?: string) => {
+  const getStatusColor = (status: string, moderationStatus?: string, paymentStatus?: string, job?: Job) => {
+    // Si el plan expiró, mostrar como expirado
+    if (job && isJobExpired(job) && moderationStatus !== 'PENDING_PAYMENT' && paymentStatus !== 'PENDING') {
+      return 'bg-red-100 text-red-800';
+    }
+
     if (moderationStatus === 'PENDING_PAYMENT' || paymentStatus === 'PENDING') {
       return 'bg-orange-100 text-orange-800';
     }
@@ -117,7 +124,12 @@ export default function PublicacionesPage() {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  const getStatusLabel = (status: string, moderationStatus?: string, paymentStatus?: string) => {
+  const getStatusLabel = (status: string, moderationStatus?: string, paymentStatus?: string, job?: Job) => {
+    // Si el plan expiró, mostrar como expirado
+    if (job && isJobExpired(job) && moderationStatus !== 'PENDING_PAYMENT' && paymentStatus !== 'PENDING') {
+      return 'Expirado';
+    }
+
     if (moderationStatus === 'PENDING_PAYMENT' || paymentStatus === 'PENDING') {
       return 'Pendiente de Pago';
     }
@@ -156,6 +168,71 @@ export default function PublicacionesPage() {
       job.paymentStatus === 'PENDING' ||
       (!job.isPaid && job.status === 'inactive')
     );
+  };
+
+  /**
+   * Verifica si el plan de un job ha expirado
+   */
+  const isJobExpired = (job: Job): boolean => {
+    const entitlement = job.entitlements?.find(
+      (ent) => ent.status === 'ACTIVE' || ent.status === 'EXPIRED'
+    );
+    if (!entitlement) return false;
+
+    if (entitlement.status === 'EXPIRED') return true;
+
+    if (entitlement.expiresAt) {
+      const expiresAt = new Date(entitlement.expiresAt);
+      return expiresAt < new Date();
+    }
+    return false;
+  };
+
+  /**
+   * Calcula el tiempo restante del entitlement activo
+   */
+  const getRemainingTime = (job: Job): { text: string; isExpired: boolean; isUrgent: boolean } | null => {
+    const entitlement = job.entitlements?.find(
+      (ent) => ent.status === 'ACTIVE' || ent.status === 'EXPIRED'
+    );
+    if (!entitlement || !entitlement.expiresAt) return null;
+
+    const now = new Date();
+    const expiresAt = new Date(entitlement.expiresAt);
+    const diffMs = expiresAt.getTime() - now.getTime();
+
+    if (diffMs <= 0) {
+      const expiredMs = Math.abs(diffMs);
+      const expiredDays = Math.floor(expiredMs / (1000 * 60 * 60 * 24));
+      if (expiredDays === 0) {
+        return { text: 'Expiró hoy', isExpired: true, isUrgent: false };
+      }
+      return {
+        text: `Expiró hace ${expiredDays} día${expiredDays > 1 ? 's' : ''}`,
+        isExpired: true,
+        isUrgent: false,
+      };
+    }
+
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+    if (days > 0) {
+      return {
+        text: `Expira en ${days} día${days > 1 ? 's' : ''}`,
+        isExpired: false,
+        isUrgent: days <= 2,
+      };
+    }
+    if (hours > 0) {
+      return {
+        text: `Expira en ${hours} hora${hours > 1 ? 's' : ''}`,
+        isExpired: false,
+        isUrgent: true,
+      };
+    }
+
+    return { text: 'Expira en menos de 1 hora', isExpired: false, isUrgent: true };
   };
 
   /**
@@ -301,13 +378,15 @@ export default function PublicacionesPage() {
                               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(
                                 job.status || 'active',
                                 job.moderationStatus,
-                                job.paymentStatus
+                                job.paymentStatus,
+                                job
                               )}`}
                             >
                               {getStatusLabel(
                                 job.status || 'active',
                                 job.moderationStatus,
-                                job.paymentStatus
+                                job.paymentStatus,
+                                job
                               )}
                             </span>
                           </div>
@@ -352,6 +431,39 @@ export default function PublicacionesPage() {
                             </div>
                           )}
 
+                          {/* Banner de plan expirado */}
+                          {isJobExpired(job) && !jobNeedsPayment && (
+                            <div className="mt-2 rounded-lg bg-red-50 border border-red-200 p-3">
+                              <div className="flex items-start">
+                                <ClockIcon className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-red-800">
+                                    Plan expirado
+                                  </p>
+                                  <p className="text-xs text-red-700 mt-0.5">
+                                    El plan de esta publicación ha expirado. La publicación ya no es visible para los postulantes.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tiempo restante del plan activo */}
+                          {(() => {
+                            const remaining = getRemainingTime(job);
+                            if (remaining && !remaining.isExpired) {
+                              return (
+                                <div className={`mt-2 rounded-lg p-2 flex items-center gap-1.5 ${
+                                  remaining.isUrgent ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-green-800'
+                                }`}>
+                                  <ClockIcon className={`h-4 w-4 ${remaining.isUrgent ? 'text-orange-500' : 'text-green-500'}`} />
+                                  <span className="text-xs font-medium">{remaining.text}</span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+
                           <div className="mt-2 space-y-1">
                             <p className="text-sm text-gray-600">
                               {job.ciudad && job.provincia
@@ -380,13 +492,30 @@ export default function PublicacionesPage() {
                         <div className="flex flex-col items-start gap-2 md:ml-4 md:items-end" onClick={(e) => e.stopPropagation()}>
                           {/* Action buttons */}
                           <div className="flex flex-wrap items-center gap-2">
-                            {!jobNeedsPayment && (
+                            {!jobNeedsPayment && !isJobExpired(job) && (
                               <Link
                                 href={`/postulantes?jobId=${job.id}`}
                                 className="rounded-md bg-[#002D5A] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#02345fb6]"
                               >
                                 Ver Postulantes
                               </Link>
+                            )}
+                            {isJobExpired(job) && !jobNeedsPayment && (
+                              <>
+                                <Link
+                                  href="/planes"
+                                  className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
+                                >
+                                  <ArrowPathIcon className="h-4 w-4" />
+                                  Renovar Plan
+                                </Link>
+                                <Link
+                                  href={`/postulantes?jobId=${job.id}`}
+                                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                                >
+                                  <UsersIcon className="h-4 w-4" />
+                                </Link>
+                              </>
                             )}
                             {jobNeedsPayment && (
                               <button

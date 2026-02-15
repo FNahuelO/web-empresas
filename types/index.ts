@@ -236,6 +236,8 @@ export interface VideoMeeting {
   updatedAt: string;
   startedAt?: string;
   endedAt?: string;
+  googleCalendarEventCreated?: boolean;
+  warning?: string;
 }
 
 export interface CreateVideoMeetingRequest {

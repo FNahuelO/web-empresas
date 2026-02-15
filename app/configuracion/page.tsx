@@ -221,97 +221,100 @@ export default function ConfiguracionPage() {
 
   const fieldLabel = (label: string, value?: string) => (
     <div>
-      <dt className="text-sm font-medium text-gray-500">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-900">{value || '—'}</dd>
+      <dt className="text-xs font-medium text-gray-400">{label}</dt>
+      <dd className="mt-0.5 text-sm font-semibold text-gray-900">{value || '—'}</dd>
     </div>
   );
 
   return (
     <Layout>
-      <div className="mx-auto max-w-4xl">
-        {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Configuración</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Gestiona la información de tu empresa
-            </p>
-          </div>
-          {!editing && (
-            <button
-              onClick={() => setEditing(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-[#002D5A] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#02345fb6] transition-colors sm:w-auto"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-              </svg>
-              Editar Perfil
-            </button>
-          )}
-        </div>
-
-        {/* Logo + nombre */}
-        <div className="mb-6 flex items-center gap-4 rounded-lg bg-white p-4 shadow sm:p-6">
-          <Avatar
-            src={profile?.logo}
-            alt={profile?.companyName || 'Empresa'}
-            size="xl"
-          />
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              {profile?.companyName || 'Sin nombre'}
-            </h2>
-            {profile?.email && (
-              <p className="text-sm text-gray-500">{profile.email}</p>
+      <div className="mx-auto max-w-5xl">
+        {/* Banner oscuro con avatar, nombre y botón editar */}
+        <div className="relative mb-6 rounded-xl bg-secondary-900 p-6 sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-5">
+              <div className="flex-shrink-0">
+                <Avatar
+                  src={profile?.logo}
+                  alt={profile?.companyName || 'Empresa'}
+                  size="xl"
+                  className="ring-4 ring-secondary-700"
+                />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">
+                  {profile?.companyName || 'Sin nombre'}
+                </h2>
+                {profile?.email && (
+                  <p className="mt-1 text-sm text-secondary-300">{profile.email}</p>
+                )}
+              </div>
+            </div>
+            {!editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-secondary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-secondary-600 transition-colors sm:w-auto"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+                Editar Perfil
+              </button>
             )}
           </div>
         </div>
 
         {/* Modo lectura */}
         {!editing && profile && (
-          <div className="space-y-6">
-            {/* Información general */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Información General</h3>
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                {fieldLabel('Nombre de la Empresa', profile.companyName)}
-                {fieldLabel('Email', profile.email)}
-                {fieldLabel('Teléfono', profile.phone)}
-                {fieldLabel('Sitio Web', profile.sitioWeb)}
-              </dl>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+            {/* Columna izquierda */}
+            <div className="space-y-6 lg:col-span-3">
+              {/* Información general */}
+              <div className="rounded-xl bg-white p-6 shadow">
+                <h3 className="mb-5 text-lg font-bold text-gray-900">Informacion General</h3>
+                <dl className="space-y-4">
+                  {fieldLabel('Nombre de la empresa', profile.companyName)}
+                  {fieldLabel('Teléfono', profile.phone)}
+                  {fieldLabel('Email', profile.email)}
+                  {fieldLabel('Sitio web', profile.sitioWeb)}
+                </dl>
+              </div>
+
+              {/* Descripción */}
+              <div className="rounded-xl bg-white p-6 shadow">
+                <h3 className="mb-5 text-lg font-bold text-gray-900">Descripción</h3>
+                <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">
+                  {profile.descripcion || '—'}
+                </p>
+              </div>
             </div>
 
-            {/* Descripción */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Descripción</h3>
-              <p className="text-sm text-gray-900 whitespace-pre-line">
-                {profile.descripcion || '—'}
-              </p>
+            {/* Columna derecha */}
+            <div className="space-y-6 lg:col-span-2">
+              {/* Ubicación */}
+              <div className="rounded-xl bg-white p-6 shadow">
+                <h3 className="mb-5 text-lg font-bold text-gray-900">Ubicación</h3>
+                <dl className="space-y-4">
+                  {fieldLabel('Ciudad', profile.ciudad)}
+                  {fieldLabel('Provincia', profile.provincia)}
+                  {fieldLabel('País', profile.pais)}
+                </dl>
+              </div>
+
+              {/* Sector e Industria */}
+              <div className="rounded-xl bg-white p-6 shadow">
+                <h3 className="mb-5 text-lg font-bold text-gray-900">Sector e Industria</h3>
+                <dl className="space-y-4">
+                  {fieldLabel('Sector', getCatalogLabel(profile.sector, sectorOptions))}
+                  {fieldLabel('Industria', getCatalogLabel(profile.industria, industriaOptions))}
+                </dl>
+              </div>
             </div>
 
-            {/* Ubicación */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Ubicación</h3>
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-                {fieldLabel('Ciudad', profile.ciudad)}
-                {fieldLabel('Provincia', profile.provincia)}
-                {fieldLabel('País', profile.pais)}
-              </dl>
-            </div>
-
-            {/* Sector e Industria */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Sector e Industria</h3>
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                {fieldLabel('Sector', getCatalogLabel(profile.sector, sectorOptions))}
-                {fieldLabel('Industria', getCatalogLabel(profile.industria, industriaOptions))}
-              </dl>
-            </div>
-
-            {/* Integraciones - Google Calendar */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Integraciones</h3>
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+            {/* Integraciones - Google Calendar (full width) */}
+            <div className="rounded-xl bg-white p-6 shadow lg:col-span-5">
+              <h3 className="mb-4 text-lg font-bold text-gray-900">Integraciones</h3>
+              <div className="flex flex-col gap-4 rounded-lg border border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   {/* Google Calendar Icon */}
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-gray-200">
@@ -366,8 +369,8 @@ export default function ConfiguracionPage() {
         {editing && (
           <form onSubmit={handleSubmit} className="space-y-6 text-black">
             {/* Información general */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Información General</h3>
+            <div className="rounded-xl bg-white p-6 shadow">
+              <h3 className="mb-4 text-lg font-bold text-gray-900">Información General</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
@@ -427,8 +430,8 @@ export default function ConfiguracionPage() {
             </div>
 
             {/* Descripción */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Descripción</h3>
+            <div className="rounded-xl bg-white p-6 shadow">
+              <h3 className="mb-4 text-lg font-bold text-gray-900">Descripción</h3>
               <textarea
                 id="descripcion"
                 rows={5}
@@ -440,8 +443,8 @@ export default function ConfiguracionPage() {
             </div>
 
             {/* Ubicación */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Ubicación</h3>
+            <div className="rounded-xl bg-white p-6 shadow">
+              <h3 className="mb-4 text-lg font-bold text-gray-900">Ubicación</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
                   <label htmlFor="provincia" className="block text-sm font-medium text-gray-700">
@@ -504,8 +507,8 @@ export default function ConfiguracionPage() {
             </div>
 
             {/* Sector e Industria */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Sector e Industria</h3>
+            <div className="rounded-xl bg-white p-6 shadow">
+              <h3 className="mb-4 text-lg font-bold text-gray-900">Sector e Industria</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="sector" className="block text-sm font-medium text-gray-700">

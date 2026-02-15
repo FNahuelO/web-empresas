@@ -95,6 +95,13 @@ export default function VideollamadasPage() {
     }
   };
 
+  const isMeetingExpired = (meeting: VideoMeeting): boolean => {
+    const scheduled = new Date(meeting.scheduledAt);
+    const durationMs = (meeting.duration || 30) * 60 * 1000;
+    const endTime = new Date(scheduled.getTime() + durationMs);
+    return new Date() > endTime;
+  };
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return d.toLocaleDateString('es-AR', {
@@ -122,12 +129,9 @@ export default function VideollamadasPage() {
     return true;
   });
 
-  const sortedMeetings = [...filteredMeetings].sort((a, b) => {
-    if (filter === 'past') {
-      return new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime();
-    }
-    return new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
-  });
+  const sortedMeetings = [...filteredMeetings].sort(
+    (a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
+  );
 
   return (
     <Layout>
@@ -232,8 +236,9 @@ export default function VideollamadasPage() {
               const statusConfig = getStatusConfig(meeting.status);
               const StatusIcon = statusConfig.icon;
               const isCreator = meeting.createdById === user?.id;
+              const expired = isMeetingExpired(meeting);
               const canCancel =
-                isCreator && ['SCHEDULED', 'ACCEPTED'].includes(meeting.status);
+                isCreator && !expired && ['SCHEDULED', 'ACCEPTED'].includes(meeting.status);
 
               return (
                 <div
@@ -279,7 +284,7 @@ export default function VideollamadasPage() {
                       </span>
 
                       <div className="flex items-center gap-2">
-                        {meeting.meetingUrl && (
+                        {meeting.meetingUrl && !expired && ['SCHEDULED', 'ACCEPTED', 'IN_PROGRESS'].includes(meeting.status) && (
                           <a
                             href={meeting.meetingUrl}
                             target="_blank"
@@ -289,6 +294,12 @@ export default function VideollamadasPage() {
                             <LinkIcon className="h-3.5 w-3.5" />
                             Unirse
                           </a>
+                        )}
+                        {expired && ['SCHEDULED', 'ACCEPTED', 'IN_PROGRESS'].includes(meeting.status) && (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500">
+                            <ClockIcon className="h-3.5 w-3.5" />
+                            Expirada
+                          </span>
                         )}
                         {canCancel && (
                           <button

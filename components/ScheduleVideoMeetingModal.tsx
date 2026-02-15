@@ -79,6 +79,12 @@ export default function ScheduleVideoMeetingModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validar que Google Calendar esté conectado
+    if (!googleCalendarConnected) {
+      toast.error('Debes conectar tu Google Calendar antes de crear una videollamada');
+      return;
+    }
+
     if (!title.trim()) {
       toast.error('Ingresa un título para la videollamada');
       return;
@@ -98,7 +104,7 @@ export default function ScheduleVideoMeetingModal({
     try {
       setIsLoading(true);
 
-      await videoMeetingService.createMeeting({
+      const meeting = await videoMeetingService.createMeeting({
         invitedUserId,
         title: title.trim(),
         description: description.trim() || undefined,
@@ -106,9 +112,16 @@ export default function ScheduleVideoMeetingModal({
         duration: parseInt(duration, 10) || 30,
       });
 
-      toast.success('Videollamada agendada exitosamente');
-
-      if (googleCalendarConnected) {
+      // Verificar si el evento de Google Calendar se creó correctamente
+      if (meeting.warning || meeting.googleCalendarEventCreated === false) {
+        toast.success('Videollamada agendada exitosamente');
+        toast.error(
+          meeting.warning ||
+            'No se pudo crear el evento en Google Calendar. Puede que necesites reconectar tu cuenta.',
+          { duration: 8000, icon: '⚠️' }
+        );
+      } else {
+        toast.success('Videollamada agendada exitosamente');
         toast.success('Evento creado en Google Calendar', { icon: '📅' });
       }
 
@@ -168,16 +181,16 @@ export default function ScheduleVideoMeetingModal({
               Google Calendar conectado — el evento se creará automáticamente
             </div>
           ) : (
-            <div className="rounded-lg bg-amber-50 px-4 py-3">
+            <div className="rounded-lg bg-amber-50 px-4 py-3 border border-amber-200">
               <div className="flex items-start gap-2">
                 <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-amber-800">
-                    Google Calendar no conectado
+                    Google Calendar requerido
                   </p>
                   <p className="mt-1 text-xs text-amber-600">
-                    Conecta tu cuenta para crear eventos automáticamente en el calendario de ambos
-                    participantes.
+                    Debes conectar tu Google Calendar para poder crear videollamadas. Esto permite generar
+                    automáticamente el enlace de Google Meet y los eventos en el calendario de ambos participantes.
                   </p>
                   <button
                     onClick={handleConnectGoogleCalendar}
@@ -311,8 +324,8 @@ export default function ScheduleVideoMeetingModal({
             </button>
             <button
               type="submit"
-              disabled={isLoading}
-              className="flex-1 rounded-lg bg-[#002D5A] py-2.5 text-sm font-semibold text-white hover:bg-[#003d7a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              disabled={isLoading || !googleCalendarConnected}
+              className="flex-1 rounded-lg bg-[#002D5A] py-2.5 text-sm font-semibold text-white hover:bg-[#003d7a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
