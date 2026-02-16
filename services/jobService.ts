@@ -27,6 +27,16 @@ class JobService {
     await httpClient.delete(API_ENDPOINTS.EMPRESAS.DELETE_JOB(id));
   }
 
+  async pauseJob(id: string): Promise<Job> {
+    const response = await httpClient.patch<{ data: Job }>(API_ENDPOINTS.EMPRESAS.PAUSE_JOB(id));
+    return response.data;
+  }
+
+  async resumeJob(id: string): Promise<Job> {
+    const response = await httpClient.patch<{ data: Job }>(API_ENDPOINTS.EMPRESAS.RESUME_JOB(id));
+    return response.data;
+  }
+
   async getJobApplicants(jobId: string): Promise<Application[]> {
     const response = await httpClient.get<{ data: Application[] }>(
       API_ENDPOINTS.EMPRESAS.APPLICANTS(jobId)

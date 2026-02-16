@@ -17,6 +17,8 @@ import {
   LockClosedIcon,
   ClockIcon,
   ArrowPathIcon,
+  PauseIcon,
+  PlayIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -25,14 +27,27 @@ import toast from 'react-hot-toast';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 import JobDetailModal from '@/components/JobDetailModal';
 
+// ── Tipos del modal de confirmación ──
+type ConfirmModalData = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  confirmColor: 'red' | 'yellow' | 'green';
+  onConfirm: () => void;
+} | null;
+
 export default function PublicacionesPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pausingId, setPausingId] = useState<string | null>(null);
   const [payingJobId, setPayingJobId] = useState<string | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Estado del modal de confirmación
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalData>(null);
 
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 
@@ -54,20 +69,95 @@ export default function PublicacionesPage() {
     }
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`¿Estás seguro de eliminar "${title}"?`)) return;
+  // ── Pausar publicación ──
+  const handlePause = (job: Job) => {
+    setConfirmModal({
+      title: 'Pausar publicación',
+      message: `¿Estás seguro de pausar "${job.title || 'Sin título'}"? La publicación dejará de ser visible para los postulantes mientras esté pausada.`,
+      confirmLabel: 'Pausar',
+      confirmColor: 'yellow',
+      onConfirm: async () => {
+        try {
+          setPausingId(job.id);
+          setConfirmModal(null);
+          await jobService.pauseJob(job.id);
+          toast.success('Publicación pausada');
+          loadJobs();
+        } catch (error: any) {
+          const msg = error?.response?.data?.message || 'Error al pausar publicación';
+          toast.error(msg);
+          console.error(error);
+        } finally {
+          setPausingId(null);
+        }
+      },
+    });
+  };
 
+  // ── Reanudar publicación ──
+  const handleResume = async (job: Job) => {
     try {
-      setDeletingId(id);
-      await jobService.deleteJob(id);
-      toast.success('Publicación eliminada');
+      setPausingId(job.id);
+      await jobService.resumeJob(job.id);
+      toast.success('Publicación reanudada');
       loadJobs();
     } catch (error: any) {
-      toast.error('Error al eliminar publicación');
+      const msg = error?.response?.data?.message || 'Error al reanudar publicación';
+      toast.error(msg);
       console.error(error);
     } finally {
-      setDeletingId(null);
+      setPausingId(null);
     }
+  };
+
+  // ── Eliminar publicación ──
+  const handleDelete = (job: Job) => {
+    // Si está activa (no pausada ni expirada), primero hay que pausarla
+    if (!canDeleteDirectly(job)) {
+      setConfirmModal({
+        title: 'Pausar antes de eliminar',
+        message: `Para eliminar "${job.title || 'Sin título'}" primero tenés que pausarla. ¿Querés pausarla ahora?`,
+        confirmLabel: 'Pausar primero',
+        confirmColor: 'yellow',
+        onConfirm: async () => {
+          try {
+            setPausingId(job.id);
+            setConfirmModal(null);
+            await jobService.pauseJob(job.id);
+            toast.success('Publicación pausada. Ahora podés eliminarla.');
+            loadJobs();
+          } catch (error: any) {
+            const msg = error?.response?.data?.message || 'Error al pausar publicación';
+            toast.error(msg);
+            console.error(error);
+          } finally {
+            setPausingId(null);
+          }
+        },
+      });
+      return;
+    }
+
+    setConfirmModal({
+      title: 'Eliminar publicación',
+      message: `¿Estás seguro de eliminar "${job.title || 'Sin título'}"? Esta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+      confirmColor: 'red',
+      onConfirm: async () => {
+        try {
+          setDeletingId(job.id);
+          setConfirmModal(null);
+          await jobService.deleteJob(job.id);
+          toast.success('Publicación eliminada');
+          loadJobs();
+        } catch (error: any) {
+          toast.error('Error al eliminar publicación');
+          console.error(error);
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   const handleCreatePaypalOrder = async (jobId: string): Promise<string> => {
@@ -97,6 +187,12 @@ export default function PublicacionesPage() {
   };
 
   const getStatusColor = (status: string, moderationStatus?: string, paymentStatus?: string, job?: Job) => {
+    const statusUpper = status?.toUpperCase();
+
+    // Pausado
+    if (statusUpper === 'PAUSED') {
+      return 'bg-amber-100 text-amber-800';
+    }
     // Si el plan expiró, mostrar como expirado
     if (job && isJobExpired(job) && moderationStatus !== 'PENDING_PAYMENT' && paymentStatus !== 'PENDING') {
       return 'bg-red-100 text-red-800';
@@ -117,14 +213,24 @@ export default function PublicacionesPage() {
 
     const colors: Record<string, string> = {
       active: 'bg-green-100 text-green-800',
+      ACTIVE: 'bg-green-100 text-green-800',
       inactive: 'bg-gray-100 text-gray-800',
+      INACTIVE: 'bg-gray-100 text-gray-800',
       draft: 'bg-yellow-100 text-yellow-800',
+      DRAFT: 'bg-yellow-100 text-yellow-800',
       closed: 'bg-red-100 text-red-800',
+      CLOSED: 'bg-red-100 text-red-800',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusLabel = (status: string, moderationStatus?: string, paymentStatus?: string, job?: Job) => {
+    const statusUpper = status?.toUpperCase();
+
+    // Pausado
+    if (statusUpper === 'PAUSED') {
+      return 'Pausado';
+    }
     // Si el plan expiró, mostrar como expirado
     if (job && isJobExpired(job) && moderationStatus !== 'PENDING_PAYMENT' && paymentStatus !== 'PENDING') {
       return 'Expirado';
@@ -145,9 +251,13 @@ export default function PublicacionesPage() {
 
     const labels: Record<string, string> = {
       active: 'Activo',
+      ACTIVE: 'Activo',
       inactive: 'Inactivo',
+      INACTIVE: 'Inactivo',
       draft: 'Borrador',
+      DRAFT: 'Borrador',
       closed: 'Cerrado',
+      CLOSED: 'Cerrado',
     };
     return labels[status] || status;
   };
@@ -166,8 +276,12 @@ export default function PublicacionesPage() {
     return (
       job.moderationStatus === 'PENDING_PAYMENT' ||
       job.paymentStatus === 'PENDING' ||
-      (!job.isPaid && job.status === 'inactive')
+      (!job.isPaid && job.status?.toLowerCase() === 'inactive')
     );
+  };
+
+  const isJobPaused = (job: Job) => {
+    return job.status?.toUpperCase() === 'PAUSED';
   };
 
   /**
@@ -186,6 +300,26 @@ export default function PublicacionesPage() {
       return expiresAt < new Date();
     }
     return false;
+  };
+
+  /**
+   * Determina si se puede eliminar directamente: pausada o expirada
+   */
+  const canDeleteDirectly = (job: Job): boolean => {
+    return isJobPaused(job) || isJobExpired(job);
+  };
+
+  /**
+   * Determina si se puede pausar: activa, aprobada, con entitlement vigente
+   */
+  const canPauseJob = (job: Job): boolean => {
+    if (isJobPaused(job)) return false;
+    if (isJobExpired(job)) return false;
+    if (isPendingPayment(job)) return false;
+    if (job.moderationStatus === 'REJECTED' || job.moderationStatus === 'AUTO_REJECTED') return false;
+    if (job.moderationStatus === 'PENDING') return false;
+    // Solo se puede pausar si está activa y aprobada
+    return job.status?.toLowerCase() === 'active' && job.moderationStatus === 'APPROVED';
   };
 
   /**
@@ -237,17 +371,14 @@ export default function PublicacionesPage() {
 
   /**
    * Determina si un job puede ser modificado según su JobPostEntitlement.
-   * Lógica idéntica a la versión mobile (canModifyJob).
    */
   const canModifyJob = (
     job: Job
   ): { canModify: boolean; reason?: string; remainingModifications?: number; maxModifications?: number } => {
-    // Obtener el entitlement activo de este job específico
     const activeEntitlement = job.entitlements?.find(
       (ent) => ent.status === 'ACTIVE'
     );
 
-    // Si no hay entitlement activo para este job, no se puede modificar
     if (!activeEntitlement) {
       return {
         canModify: false,
@@ -257,7 +388,6 @@ export default function PublicacionesPage() {
       };
     }
 
-    // Verificar si el entitlement ha expirado
     if (activeEntitlement.expiresAt) {
       const expiresAt = new Date(activeEntitlement.expiresAt);
       const now = new Date();
@@ -271,7 +401,6 @@ export default function PublicacionesPage() {
       }
     }
 
-    // Si el entitlement no permite modificaciones (maxEdits === 0)
     if (activeEntitlement.maxEdits === 0) {
       return {
         canModify: false,
@@ -281,7 +410,6 @@ export default function PublicacionesPage() {
       };
     }
 
-    // Calcular modificaciones restantes
     const editsUsed = activeEntitlement.editsUsed || 0;
     const remainingModifications = activeEntitlement.maxEdits - editsUsed;
 
@@ -360,12 +488,16 @@ export default function PublicacionesPage() {
                 const jobNeedsPayment = isPendingPayment(job);
                 const isPayingThis = payingJobId === job.id;
                 const modificationInfo = canModifyJob(job);
+                const jobPaused = isJobPaused(job);
+                const jobExpired = isJobExpired(job);
 
                 return (
                   <div
                     key={job.id}
                     onClick={() => handleViewJobDetail(job)}
-                    className="cursor-pointer overflow-hidden rounded-lg bg-white shadow hover:shadow-md transition-shadow"
+                    className={`cursor-pointer overflow-hidden rounded-lg bg-white shadow hover:shadow-md transition-shadow ${
+                      jobPaused ? 'border-l-4 border-amber-400' : ''
+                    }`}
                   >
                     <div className="p-4 sm:p-6">
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -390,6 +522,23 @@ export default function PublicacionesPage() {
                               )}
                             </span>
                           </div>
+
+                          {/* Pausado info */}
+                          {jobPaused && (
+                            <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3">
+                              <div className="flex items-start">
+                                <PauseIcon className="h-5 w-5 text-amber-500 mr-2 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-amber-800">
+                                    Publicación pausada
+                                  </p>
+                                  <p className="text-xs text-amber-700 mt-0.5">
+                                    Esta publicación no es visible para los postulantes. Podés reanudarla o eliminarla.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
                           {/* Pending Payment Alert */}
                           {jobNeedsPayment && (
@@ -432,7 +581,7 @@ export default function PublicacionesPage() {
                           )}
 
                           {/* Banner de plan expirado */}
-                          {isJobExpired(job) && !jobNeedsPayment && (
+                          {jobExpired && !jobNeedsPayment && !jobPaused && (
                             <div className="mt-2 rounded-lg bg-red-50 border border-red-200 p-3">
                               <div className="flex items-start">
                                 <ClockIcon className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
@@ -451,7 +600,7 @@ export default function PublicacionesPage() {
                           {/* Tiempo restante del plan activo */}
                           {(() => {
                             const remaining = getRemainingTime(job);
-                            if (remaining && !remaining.isExpired) {
+                            if (remaining && !remaining.isExpired && !jobPaused) {
                               return (
                                 <div className={`mt-2 rounded-lg p-2 flex items-center gap-1.5 ${
                                   remaining.isUrgent ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-green-800'
@@ -492,7 +641,8 @@ export default function PublicacionesPage() {
                         <div className="flex flex-col items-start gap-2 md:ml-4 md:items-end" onClick={(e) => e.stopPropagation()}>
                           {/* Action buttons */}
                           <div className="flex flex-wrap items-center gap-2">
-                            {!jobNeedsPayment && !isJobExpired(job) && (
+                            {/* Ver postulantes (activa, no expirada ni pausada) */}
+                            {!jobNeedsPayment && !jobExpired && !jobPaused && (
                               <Link
                                 href={`/postulantes?jobId=${job.id}`}
                                 className="rounded-md bg-[#002D5A] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#02345fb6]"
@@ -500,7 +650,47 @@ export default function PublicacionesPage() {
                                 Ver Postulantes
                               </Link>
                             )}
-                            {isJobExpired(job) && !jobNeedsPayment && (
+
+                            {/* Pausar publicación */}
+                            {canPauseJob(job) && (
+                              <button
+                                onClick={() => handlePause(job)}
+                                disabled={pausingId === job.id}
+                                className="flex items-center gap-1 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                                title="Pausar publicación"
+                              >
+                                {pausingId === job.id ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-600 border-t-transparent"></div>
+                                ) : (
+                                  <>
+                                    <PauseIcon className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Pausar</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                            {/* Reanudar publicación */}
+                            {jobPaused && (
+                              <button
+                                onClick={() => handleResume(job)}
+                                disabled={pausingId === job.id}
+                                className="flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                                title="Reanudar publicación"
+                              >
+                                {pausingId === job.id ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                ) : (
+                                  <>
+                                    <PlayIcon className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Reanudar</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                            {/* Renovar plan (expirado) */}
+                            {jobExpired && !jobNeedsPayment && (
                               <>
                                 <Link
                                   href="/planes"
@@ -517,6 +707,8 @@ export default function PublicacionesPage() {
                                 </Link>
                               </>
                             )}
+
+                            {/* Pagar */}
                             {jobNeedsPayment && (
                               <button
                                 onClick={() =>
@@ -528,7 +720,9 @@ export default function PublicacionesPage() {
                                 {isPayingThis ? 'Cancelar' : 'Pagar Ahora'}
                               </button>
                             )}
-                            {modificationInfo.canModify ? (
+
+                            {/* Editar */}
+                            {modificationInfo.canModify && !jobPaused ? (
                               <div className="relative group">
                                 <Link
                                   href={`/publicaciones/${job.id}/editar`}
@@ -545,7 +739,7 @@ export default function PublicacionesPage() {
                                   </div>
                                 )}
                               </div>
-                            ) : (
+                            ) : !jobPaused && !jobExpired ? (
                               <div className="relative group">
                                 <button
                                   disabled
@@ -564,18 +758,26 @@ export default function PublicacionesPage() {
                                   </div>
                                 </div>
                               </div>
+                            ) : null}
+
+                            {/* Eliminar */}
+                            {!jobNeedsPayment && (
+                              <button
+                                onClick={() => handleDelete(job)}
+                                disabled={deletingId === job.id || pausingId === job.id}
+                                className="flex items-center gap-1 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                                title={canDeleteDirectly(job) ? 'Eliminar publicación' : 'Pausar y eliminar publicación'}
+                              >
+                                {deletingId === job.id ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent"></div>
+                                ) : (
+                                  <>
+                                    <TrashIcon className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Eliminar</span>
+                                  </>
+                                )}
+                              </button>
                             )}
-                            <button
-                              onClick={() => handleDelete(job.id, job.title || '')}
-                              disabled={deletingId === job.id}
-                              className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                            >
-                              {deletingId === job.id ? (
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent"></div>
-                              ) : (
-                                <TrashIcon className="h-4 w-4" />
-                              )}
-                            </button>
                           </div>
 
                           {/* Inline PayPal Payment */}
@@ -648,6 +850,64 @@ export default function PublicacionesPage() {
           job={selectedJob}
           onClose={handleCloseJobDetail}
         />
+      )}
+
+      {/* ── Modal de Confirmación (reemplazo de confirm/alert) ── */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl animate-in fade-in zoom-in duration-200">
+            {/* Icono */}
+            <div className="flex justify-center pt-6">
+              {confirmModal.confirmColor === 'red' && (
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                  <TrashIcon className="h-6 w-6 text-red-600" />
+                </div>
+              )}
+              {confirmModal.confirmColor === 'yellow' && (
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
+                  <PauseIcon className="h-6 w-6 text-amber-600" />
+                </div>
+              )}
+              {confirmModal.confirmColor === 'green' && (
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                  <CheckCircleIcon className="h-6 w-6 text-green-600" />
+                </div>
+              )}
+            </div>
+
+            {/* Contenido */}
+            <div className="px-6 pt-4 pb-2 text-center">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {confirmModal.title}
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                {confirmModal.message}
+              </p>
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-3 px-6 py-4">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold text-white transition-colors ${
+                  confirmModal.confirmColor === 'red'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : confirmModal.confirmColor === 'yellow'
+                    ? 'bg-amber-600 hover:bg-amber-700'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {confirmModal.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );

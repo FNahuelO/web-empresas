@@ -255,3 +255,37 @@ export interface UpdateVideoMeetingRequest {
   duration?: number;
   meetingUrl?: string;
 }
+
+// Promociones
+export interface PromotionData {
+  code: string;
+  title: string;
+  description: string;
+  durationDays: number;
+  metadata?: {
+    icon?: string;
+    buttonText?: string;
+    [key: string]: any;
+  };
+}
+
+export interface LaunchTrialStatus {
+  eligible: boolean;
+  alreadyUsed: boolean;
+  windowOpen: boolean;
+  reason?: string;
+  promotion: PromotionData | null;
+}
+
+export interface LaunchTrialClaimResponse {
+  id: string;
+  status: string;
+  claimedAt: string;
+  usedAt?: string;
+  jobPostId: string;
+  entitlement?: {
+    jobPostId: string;
+    expiresAt: string;
+    status: string;
+  };
+}

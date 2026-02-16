@@ -21,6 +21,8 @@ export const API_ENDPOINTS = {
     CREATE_JOB: '/api/empresas/jobs',
     UPDATE_JOB: (id: string) => `/api/empresas/jobs/${id}`,
     DELETE_JOB: (id: string) => `/api/empresas/jobs/${id}`,
+    PAUSE_JOB: (id: string) => `/api/empresas/jobs/${id}/pause`,
+    RESUME_JOB: (id: string) => `/api/empresas/jobs/${id}/resume`,
     APPLICANTS: (jobId: string) => `/api/empresas/jobs/${jobId}/applicants`,
     UPDATE_APPLICATION: (id: string) => `/api/empresas/applications/${id}`,
     GENERATE_JOB_DESCRIPTION: '/api/empresas/jobs/generate-description',
@@ -76,6 +78,12 @@ export const API_ENDPOINTS = {
     REFRESH_TOKEN: '/api/google-meet/refresh-token',
     STATUS: '/api/google-meet/status',
     DISCONNECT: '/api/google-meet/disconnect',
+  },
+
+  // Promociones
+  PROMOTIONS: {
+    LAUNCH_TRIAL_STATUS: '/api/promotions/launch-trial/status',
+    LAUNCH_TRIAL_CLAIM: '/api/promotions/launch-trial/claim',
   },
 
   // Catálogos

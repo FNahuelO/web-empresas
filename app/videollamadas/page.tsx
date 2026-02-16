@@ -22,6 +22,7 @@ export default function VideollamadasPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
+  const [cancelMeetingId, setCancelMeetingId] = useState<string | null>(null);
   const { user } = useAuthStore();
 
   useEffect(() => {
@@ -64,8 +65,8 @@ export default function VideollamadasPage() {
   };
 
   const handleCancelMeeting = async (meetingId: string) => {
-    if (!confirm('¿Estás seguro de cancelar esta videollamada?')) return;
     try {
+      setCancelMeetingId(null);
       await videoMeetingService.cancelMeeting(meetingId);
       toast.success('Videollamada cancelada');
       loadMeetings();
@@ -303,7 +304,7 @@ export default function VideollamadasPage() {
                         )}
                         {canCancel && (
                           <button
-                            onClick={() => handleCancelMeeting(meeting.id)}
+                            onClick={() => setCancelMeetingId(meeting.id)}
                             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
                           >
                             Cancelar
@@ -318,6 +319,46 @@ export default function VideollamadasPage() {
           </div>
         )}
       </div>
+
+      {/* ── Modal de Confirmación para Cancelar Videollamada ── */}
+      {cancelMeetingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl">
+            {/* Icono */}
+            <div className="flex justify-center pt-6">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                <XCircleIcon className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+
+            {/* Contenido */}
+            <div className="px-6 pt-4 pb-2 text-center">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Cancelar videollamada
+              </h3>
+              <p className="mt-2 text-sm text-gray-600">
+                ¿Estás seguro de cancelar esta videollamada? Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-3 px-6 py-4">
+              <button
+                onClick={() => setCancelMeetingId(null)}
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Volver
+              </button>
+              <button
+                onClick={() => handleCancelMeeting(cancelMeetingId)}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700 transition-colors"
+              >
+                Cancelar videollamada
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
