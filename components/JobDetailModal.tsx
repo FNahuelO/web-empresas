@@ -101,14 +101,17 @@ export default function JobDetailModal({ visible, job, onClose }: JobDetailModal
     return tipo === 'Tiempo Completo' ? 'Jornada completa' : 'Jornada parcial';
   };
 
+  const formatMonto = (value: number) =>
+    value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
   const getSalario = () => {
     const min = job.salarioMin || job.minSalary;
     const max = job.salarioMax || job.maxSalary;
     const moneda = job.moneda || 'ARS';
 
-    if (min && max) return `${moneda} $${min.toLocaleString()} - $${max.toLocaleString()}`;
-    if (min) return `${moneda} $${min.toLocaleString()}`;
-    if (max) return `Hasta ${moneda} $${max.toLocaleString()}`;
+    if (min && max) return `${moneda} $${formatMonto(min)} - $${formatMonto(max)}`;
+    if (min) return `${moneda} $${formatMonto(min)}`;
+    if (max) return `Hasta ${moneda} $${formatMonto(max)}`;
     return null;
   };
 

@@ -553,7 +553,7 @@ export default function PublicacionesPage() {
                                     Esta publicación requiere pago para ser publicada.
                                     {job.paymentAmount && (
                                       <span className="font-semibold">
-                                        {' '}Monto: ${job.paymentAmount.toFixed(2)} {job.paymentCurrency || 'USD'}
+                                        {' '}Monto: ${job.paymentAmount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {job.paymentCurrency || 'USD'}
                                       </span>
                                     )}
                                   </p>

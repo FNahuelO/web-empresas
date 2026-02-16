@@ -510,24 +510,32 @@ export default function EditarPublicacionPage() {
                       <label htmlFor="minSalary" className="block text-sm font-medium text-gray-700">
                         Salario Mínimo
                       </label>
-                      <input
-                        type="number"
-                        id="minSalary"
-                        {...register('minSalary', { valueAsNumber: true, min: 0 })}
-                        className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      />
+                      <div className="relative mt-1">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          id="minSalary"
+                          placeholder="0"
+                          {...register('minSalary', { valueAsNumber: true, min: 0 })}
+                          className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        />
+                      </div>
                     </div>
 
                     <div>
                       <label htmlFor="maxSalary" className="block text-sm font-medium text-gray-700">
                         Salario Máximo
                       </label>
-                      <input
-                        type="number"
-                        id="maxSalary"
-                        {...register('maxSalary', { valueAsNumber: true, min: 0 })}
-                        className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      />
+                      <div className="relative mt-1">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          id="maxSalary"
+                          placeholder="0"
+                          {...register('maxSalary', { valueAsNumber: true, min: 0 })}
+                          className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

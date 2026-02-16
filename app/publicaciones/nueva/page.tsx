@@ -7,7 +7,8 @@ import Layout from '@/components/Layout';
 import { jobService } from '@/services/jobService';
 import { subscriptionService } from '@/services/subscriptionService';
 import { paymentService } from '@/services/paymentService';
-import { Job, Plan } from '@/types';
+import { promotionService } from '@/services/promotionService';
+import { Job, Plan, LaunchTrialStatus } from '@/types';
 import toast from 'react-hot-toast';
 import {
   CheckIcon,
@@ -15,6 +16,8 @@ import {
   DocumentTextIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
+  GiftIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 import argentinaLocationsData from '@/data/argentina-locations.json';
@@ -97,6 +100,9 @@ export default function NuevaPublicacionPage() {
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [needsPayment, setNeedsPayment] = useState(false);
+  const [promoStatus, setPromoStatus] = useState<LaunchTrialStatus | null>(null);
+  const [promoSelected, setPromoSelected] = useState(false);
+  const [claimingPromo, setClaimingPromo] = useState(false);
 
   const {
     register,
@@ -153,15 +159,23 @@ export default function NuevaPublicacionPage() {
   const loadPlans = async () => {
     setLoadingPlans(true);
     try {
-      const plansData = await subscriptionService.getPlans();
+      const [plansData, promoData] = await Promise.all([
+        subscriptionService.getPlans(),
+        promotionService.getLaunchTrialStatus().catch(() => null),
+      ]);
       const plansArray = Array.isArray(plansData) ? plansData : [];
       // Filtrar solo planes activos y ordenar por precio
       const activePlans = plansArray
         .filter((p: any) => p.isActive !== false)
         .sort((a: Plan, b: Plan) => (a.order || 0) - (b.order || 0) || a.price - b.price);
       setPlans(activePlans);
-      if (activePlans.length > 0) {
-        // Seleccionar el plan del medio o el primero
+      setPromoStatus(promoData);
+
+      // Si hay promo disponible, preseleccionarla; sino seleccionar plan del medio
+      if (promoData?.eligible && !promoData.alreadyUsed && promoData.windowOpen) {
+        setPromoSelected(true);
+        setSelectedPlan(null);
+      } else if (activePlans.length > 0) {
         const midIndex = Math.floor(activePlans.length / 2);
         setSelectedPlan(activePlans[midIndex] || activePlans[0]);
       }
@@ -274,6 +288,24 @@ export default function NuevaPublicacionPage() {
     console.error('PayPal error:', error);
     setPaymentError('Error en el proceso de pago. Por favor, intenta nuevamente.');
     toast.error('Error en PayPal. Intenta nuevamente.');
+  };
+
+  const handleClaimPromo = async () => {
+    if (!createdJob?.id) return;
+    try {
+      setClaimingPromo(true);
+      await promotionService.claimLaunchTrial(createdJob.id);
+      toast.success('¡Promoción activada! Tu publicación ya está activa.');
+      setStep('success');
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Error al activar la promoción';
+      toast.error(msg);
+    } finally {
+      setClaimingPromo(false);
+    }
   };
 
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
@@ -509,24 +541,32 @@ export default function NuevaPublicacionPage() {
                     <label htmlFor="minSalary" className="block text-sm font-medium text-gray-700">
                       Salario Mínimo
                     </label>
-                    <input
-                      type="number"
-                      id="minSalary"
-                      {...register('minSalary', { valueAsNumber: true, min: 0 })}
-                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-                    />
+                    <div className="relative mt-1">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        id="minSalary"
+                        placeholder="0"
+                        {...register('minSalary', { valueAsNumber: true, min: 0 })}
+                        className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                      />
+                    </div>
                   </div>
 
                   <div>
                     <label htmlFor="maxSalary" className="block text-sm font-medium text-gray-700">
                       Salario Máximo
                     </label>
-                    <input
-                      type="number"
-                      id="maxSalary"
-                      {...register('maxSalary', { valueAsNumber: true, min: 0 })}
-                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-                    />
+                    <div className="relative mt-1">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        id="maxSalary"
+                        placeholder="0"
+                        {...register('maxSalary', { valueAsNumber: true, min: 0 })}
+                        className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -652,14 +692,61 @@ export default function NuevaPublicacionPage() {
                     </div>
                   ))}
                 </div>
-              ) : plans.length > 0 ? (
+              ) : (plans.length > 0 || (promoStatus?.eligible && !promoStatus.alreadyUsed)) ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {/* Card de Promoción */}
+                  {promoStatus?.promotion && promoStatus.eligible && !promoStatus.alreadyUsed && promoStatus.windowOpen && (
+                    <div
+                      onClick={() => {
+                        setPromoSelected(true);
+                        setSelectedPlan(null);
+                      }}
+                      className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${
+                        promoSelected
+                          ? 'border-green-500 bg-gradient-to-br from-green-600 to-emerald-700 ring-1 ring-green-500'
+                          : 'border-green-300 bg-gradient-to-br from-green-600 to-emerald-700 hover:border-green-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <GiftIcon className="h-4 w-4 text-white" />
+                          <h3 className="text-base font-bold text-white">
+                            {promoStatus.promotion.title}
+                          </h3>
+                        </div>
+                        {promoSelected && (
+                          <CheckIcon className="h-5 w-5 text-white" />
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-green-100">
+                        {promoStatus.promotion.description}
+                      </p>
+                      <div className="mt-3">
+                        <span className="text-2xl font-bold text-white">GRATIS</span>
+                      </div>
+                      <div className="mt-3 space-y-1">
+                        <p className="text-xs text-green-100">
+                          ✓ {promoStatus.promotion.durationDays} días de publicación
+                        </p>
+                        <p className="text-xs text-green-100">✓ CVs ilimitados</p>
+                        <p className="text-xs text-green-100">✓ Activación inmediata</p>
+                        <p className="text-xs text-yellow-200 flex items-center gap-1">
+                          <SparklesIcon className="h-3 w-3" /> Sin costo
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cards de planes */}
                   {plans.map((plan) => {
-                    const isSelected = selectedPlan?.id === plan.id;
+                    const isSelected = !promoSelected && selectedPlan?.id === plan.id;
                     return (
                       <div
                         key={plan.id}
-                        onClick={() => setSelectedPlan(plan)}
+                        onClick={() => {
+                          setSelectedPlan(plan);
+                          setPromoSelected(false);
+                        }}
                         className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${
                           isSelected
                             ? 'border-primary-600 bg-primary-50 ring-1 ring-primary-600'
@@ -736,94 +823,148 @@ export default function NuevaPublicacionPage() {
               )}
             </div>
 
-            {/* Payment Section */}
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Pagar con PayPal</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                Realiza el pago de forma segura con PayPal para publicar tu empleo
-              </p>
+            {/* Payment / Promo Activation Section */}
+            {promoSelected && promoStatus?.promotion ? (
+              <div className="rounded-lg bg-white p-6 shadow">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Activar Promoción</h2>
+                <p className="text-sm text-gray-500 mb-6">
+                  Activá la promoción gratuita para publicar tu empleo sin costo
+                </p>
 
-              {/* Price Summary */}
-              <div className="mb-6 rounded-lg bg-gray-50 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedPlan ? selectedPlan.name : 'Publicación de Empleo'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {selectedPlan
-                        ? `${selectedPlan.durationDays} días de publicación`
-                        : 'Publicación estándar'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-gray-900">
-                      ${selectedPlan?.price?.toFixed(2) || createdJob.paymentAmount?.toFixed(2) || '10.00'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {selectedPlan?.currency || createdJob.paymentCurrency || 'USD'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {paymentError && (
-                <div className="mb-4 rounded-lg bg-red-50 p-4">
-                  <div className="flex items-start">
-                    <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-red-800">{paymentError}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* PayPal Buttons */}
-              {paypalClientId && paypalClientId !== 'YOUR_PAYPAL_CLIENT_ID_HERE' ? (
-                <PayPalScriptProvider
-                  options={{
-                    clientId: paypalClientId,
-                    currency: createdJob.paymentCurrency || 'USD',
-                    intent: 'capture',
-                  }}
-                >
-                  <PayPalButtons
-                    style={{
-                      layout: 'vertical',
-                      color: 'blue',
-                      shape: 'rect',
-                      label: 'pay',
-                      height: 48,
-                    }}
-                    disabled={isLoading || isCreatingOrder}
-                    createOrder={async () => {
-                      return await handleCreatePaypalOrder();
-                    }}
-                    onApprove={async (data) => {
-                      await handlePaypalApprove(data);
-                    }}
-                    onError={handlePaypalError}
-                    onCancel={() => {
-                      toast('Pago cancelado', { icon: '⚠️' });
-                    }}
-                  />
-                </PayPalScriptProvider>
-              ) : (
-                <div className="space-y-4">
-                  <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
-                    <div className="flex items-start">
-                      <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+                {/* Promo Summary */}
+                <div className="mb-6 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                        <GiftIcon className="h-5 w-5 text-green-600" />
+                      </div>
                       <div>
-                        <p className="text-sm font-medium text-yellow-800">
-                          PayPal no configurado
+                        <p className="text-sm font-medium text-gray-900">
+                          {promoStatus.promotion.title}
                         </p>
-                        <p className="text-xs text-yellow-700 mt-1">
-                          Configura <code className="bg-yellow-100 px-1 rounded">NEXT_PUBLIC_PAYPAL_CLIENT_ID</code> en el archivo <code className="bg-yellow-100 px-1 rounded">.env.local</code> para habilitar los pagos con PayPal.
+                        <p className="text-xs text-gray-500">
+                          {promoStatus.promotion.durationDays} días de publicación
                         </p>
                       </div>
                     </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-green-600">GRATIS</p>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
+
+                <button
+                  onClick={handleClaimPromo}
+                  disabled={claimingPromo}
+                  className={`w-full rounded-lg bg-green-600 py-3 text-sm font-bold text-white shadow transition-all hover:bg-green-700 ${
+                    claimingPromo ? 'cursor-not-allowed opacity-50' : ''
+                  }`}
+                >
+                  {claimingPromo ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Activando promoción...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <SparklesIcon className="h-4 w-4" />
+                      {promoStatus.promotion.metadata?.buttonText || 'Activar promoción gratuita'}
+                    </span>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-white p-6 shadow">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Pagar con PayPal</h2>
+                <p className="text-sm text-gray-500 mb-6">
+                  Realiza el pago de forma segura con PayPal para publicar tu empleo
+                </p>
+
+                {/* Price Summary */}
+                <div className="mb-6 rounded-lg bg-gray-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {selectedPlan ? selectedPlan.name : 'Publicación de Empleo'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {selectedPlan
+                          ? `${selectedPlan.durationDays} días de publicación`
+                          : 'Publicación estándar'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-gray-900">
+                        ${selectedPlan?.price?.toFixed(2) || createdJob.paymentAmount?.toFixed(2) || '10.00'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {selectedPlan?.currency || createdJob.paymentCurrency || 'USD'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {paymentError && (
+                  <div className="mb-4 rounded-lg bg-red-50 p-4">
+                    <div className="flex items-start">
+                      <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-800">{paymentError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* PayPal Buttons */}
+                {paypalClientId && paypalClientId !== 'YOUR_PAYPAL_CLIENT_ID_HERE' ? (
+                  <PayPalScriptProvider
+                    options={{
+                      clientId: paypalClientId,
+                      currency: createdJob.paymentCurrency || 'USD',
+                      intent: 'capture',
+                    }}
+                  >
+                    <PayPalButtons
+                      style={{
+                        layout: 'vertical',
+                        color: 'blue',
+                        shape: 'rect',
+                        label: 'pay',
+                        height: 48,
+                      }}
+                      disabled={isLoading || isCreatingOrder}
+                      createOrder={async () => {
+                        return await handleCreatePaypalOrder();
+                      }}
+                      onApprove={async (data) => {
+                        await handlePaypalApprove(data);
+                      }}
+                      onError={handlePaypalError}
+                      onCancel={() => {
+                        toast('Pago cancelado', { icon: '⚠️' });
+                      }}
+                    />
+                  </PayPalScriptProvider>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
+                      <div className="flex items-start">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-yellow-800">
+                            PayPal no configurado
+                          </p>
+                          <p className="text-xs text-yellow-700 mt-1">
+                            Configura <code className="bg-yellow-100 px-1 rounded">NEXT_PUBLIC_PAYPAL_CLIENT_ID</code> en el archivo <code className="bg-yellow-100 px-1 rounded">.env.local</code> para habilitar los pagos con PayPal.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             
           </div>
