@@ -41,6 +41,7 @@ interface JobFormData {
   modality: string;
   category: string;
   experienceLevel: string;
+  schedule: string;
   minSalary: number;
   maxSalary: number;
 }
@@ -79,6 +80,16 @@ const EXPERIENCE_LEVELS = [
   { value: 'SENIOR', label: 'Senior' },
 ];
 
+const JOB_SCHEDULES = [
+  { value: 'MANANA', label: 'Mañana' },
+  { value: 'TARDE', label: 'Tarde' },
+  { value: 'NOCHE', label: 'Noche' },
+  { value: 'MANANA_TARDE', label: 'Mañana y Tarde' },
+  { value: 'ROTATIVO', label: 'Rotativo' },
+  { value: 'FLEXIBLE', label: 'Flexible' },
+  { value: 'COMPLETO', label: 'Jornada Completa' },
+];
+
 export default function EditarPublicacionPage() {
   const router = useRouter();
   const params = useParams();
@@ -113,12 +124,26 @@ export default function EditarPublicacionPage() {
       modality: 'PRESENCIAL',
       category: '',
       experienceLevel: 'JUNIOR',
+      schedule: '',
       minSalary: 0,
       maxSalary: 0,
     },
   });
 
   const selectedProvincia = watch('location');
+  const minSalaryValue = watch('minSalary');
+  const maxSalaryValue = watch('maxSalary');
+
+  const formatSalary = (value: number): string => {
+    if (!value || isNaN(value) || value === 0) return '';
+    return value.toLocaleString('es-AR');
+  };
+
+  const handleSalaryChange = (field: 'minSalary' | 'maxSalary', rawValue: string) => {
+    const cleaned = rawValue.replace(/\D/g, '');
+    const num = parseInt(cleaned, 10);
+    setValue(field, isNaN(num) ? 0 : num);
+  };
 
   // Provincias ordenadas alfabéticamente
   const provinces = useMemo(() => {
@@ -216,6 +241,7 @@ export default function EditarPublicacionPage() {
         modality: data.workMode || data.modality || 'PRESENCIAL',
         category: data.category || '',
         experienceLevel: data.experienceLevel || 'JUNIOR',
+        schedule: data.schedule || '',
         minSalary: data.salarioMin || data.minSalary || 0,
         maxSalary: data.salarioMax || data.maxSalary || 0,
       });
@@ -250,6 +276,7 @@ export default function EditarPublicacionPage() {
         workMode: data.modality,
         experienceLevel: data.experienceLevel,
         ...(data.category ? { category: data.category } : {}),
+        ...(data.schedule ? { schedule: data.schedule } : {}),
       };
 
       // Asignar provincia y localidad
@@ -466,23 +493,7 @@ export default function EditarPublicacionPage() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                        Categoría
-                      </label>
-                      <select
-                        id="category"
-                        {...register('category')}
-                        className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        <option value="">Seleccionar categoría</option>
-                        {JOB_CATEGORIES.map((cat) => (
-                          <option key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+
 
                     <div>
                       <label htmlFor="experienceLevel" className="block text-sm font-medium text-gray-700">
@@ -503,6 +514,42 @@ export default function EditarPublicacionPage() {
                         <p className="mt-1 text-sm text-red-600">{errors.experienceLevel.message}</p>
                       )}
                     </div>
+
+                    <div>
+                      <label htmlFor="schedule" className="block text-sm font-medium text-gray-700">
+                        Horario
+                      </label>
+                      <select
+                        id="schedule"
+                        {...register('schedule')}
+                        className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Seleccionar horario</option>
+                        {JOB_SCHEDULES.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                      Categoría
+                    </label>
+                    <select
+                      id="category"
+                      {...register('category')}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Seleccionar categoría</option>
+                      {JOB_CATEGORIES.map((cat) => (
+                        <option key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -513,10 +560,12 @@ export default function EditarPublicacionPage() {
                       <div className="relative mt-1">
                         <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           id="minSalary"
                           placeholder="0"
-                          {...register('minSalary', { valueAsNumber: true, min: 0 })}
+                          value={formatSalary(minSalaryValue)}
+                          onChange={(e) => handleSalaryChange('minSalary', e.target.value)}
                           className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                       </div>
@@ -529,10 +578,12 @@ export default function EditarPublicacionPage() {
                       <div className="relative mt-1">
                         <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           id="maxSalary"
                           placeholder="0"
-                          {...register('maxSalary', { valueAsNumber: true, min: 0 })}
+                          value={formatSalary(maxSalaryValue)}
+                          onChange={(e) => handleSalaryChange('maxSalary', e.target.value)}
                           className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                       </div>

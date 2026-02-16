@@ -39,6 +39,7 @@ export interface Job {
   moderationStatus?: string;
   moderationReason?: string;
   autoRejectionReason?: string;
+  schedule?: string;
   publishedAt?: string;
   fechaPublicacion?: string;
   salarioMin?: number;

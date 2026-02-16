@@ -48,6 +48,7 @@ interface JobFormData {
   modality: string;
   category: string;
   experienceLevel: string;
+  schedule: string;
   minSalary: number;
   maxSalary: number;
 }
@@ -86,6 +87,16 @@ const EXPERIENCE_LEVELS = [
   { value: 'SENIOR', label: 'Senior' },
 ];
 
+const JOB_SCHEDULES = [
+  { value: 'MANANA', label: 'Mañana' },
+  { value: 'TARDE', label: 'Tarde' },
+  { value: 'NOCHE', label: 'Noche' },
+  { value: 'MANANA_TARDE', label: 'Mañana y Tarde' },
+  { value: 'ROTATIVO', label: 'Rotativo' },
+  { value: 'FLEXIBLE', label: 'Flexible' },
+  { value: 'COMPLETO', label: 'Jornada Completa' },
+];
+
 type Step = 'form' | 'payment' | 'success';
 
 export default function NuevaPublicacionPage() {
@@ -122,12 +133,26 @@ export default function NuevaPublicacionPage() {
       modality: 'PRESENCIAL',
       category: '',
       experienceLevel: 'JUNIOR',
+      schedule: '',
       minSalary: 0,
       maxSalary: 0,
     },
   });
 
   const selectedProvincia = watch('location');
+  const minSalaryValue = watch('minSalary');
+  const maxSalaryValue = watch('maxSalary');
+
+  const formatSalary = (value: number): string => {
+    if (!value || isNaN(value) || value === 0) return '';
+    return value.toLocaleString('es-AR');
+  };
+
+  const handleSalaryChange = (field: 'minSalary' | 'maxSalary', rawValue: string) => {
+    const cleaned = rawValue.replace(/\D/g, '');
+    const num = parseInt(cleaned, 10);
+    setValue(field, isNaN(num) ? 0 : num);
+  };
 
   // Provincias ordenadas alfabéticamente
   const provinces = useMemo(() => {
@@ -203,6 +228,7 @@ export default function NuevaPublicacionPage() {
         workMode: data.modality,
         experienceLevel: data.experienceLevel,
         ...(data.category ? { category: data.category } : {}),
+        ...(data.schedule ? { schedule: data.schedule } : {}),
       };
 
       // Asignar provincia y localidad
@@ -345,46 +371,41 @@ export default function NuevaPublicacionPage() {
                     <div className="flex w-full items-center">
                       {idx > 0 && (
                         <div
-                          className={`h-0.5 flex-1 ${
-                            idx <= currentStepIndex ? 'bg-primary-600' : 'bg-gray-300'
-                          }`}
+                          className={`h-0.5 flex-1 ${idx <= currentStepIndex ? 'bg-primary-600' : 'bg-gray-300'
+                            }`}
                         />
                       )}
                       <div
-                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full sm:h-10 sm:w-10 ${
-                          isCompleted
-                            ? 'bg-primary-600'
-                            : isCurrent
+                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full sm:h-10 sm:w-10 ${isCompleted
+                          ? 'bg-primary-600'
+                          : isCurrent
                             ? 'border-2 border-primary-600 bg-white'
                             : 'border-2 border-gray-300 bg-white'
-                        }`}
+                          }`}
                       >
                         {isCompleted ? (
                           <CheckIcon className="h-4 w-4 text-white sm:h-5 sm:w-5" />
                         ) : (
                           <s.icon
-                            className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                              isCurrent ? 'text-primary-600' : 'text-gray-400'
-                            }`}
+                            className={`h-4 w-4 sm:h-5 sm:w-5 ${isCurrent ? 'text-primary-600' : 'text-gray-400'
+                              }`}
                           />
                         )}
                       </div>
                       {idx < steps.length - 1 && (
                         <div
-                          className={`h-0.5 flex-1 ${
-                            isCompleted ? 'bg-primary-600' : 'bg-gray-300'
-                          }`}
+                          className={`h-0.5 flex-1 ${isCompleted ? 'bg-primary-600' : 'bg-gray-300'
+                            }`}
                         />
                       )}
                     </div>
                     <span
-                      className={`mt-2 text-xs font-medium sm:text-sm ${
-                        isCurrent
-                          ? 'text-primary-600'
-                          : isCompleted
+                      className={`mt-2 text-xs font-medium sm:text-sm ${isCurrent
+                        ? 'text-primary-600'
+                        : isCompleted
                           ? 'text-gray-900'
                           : 'text-gray-400'
-                      }`}
+                        }`}
                     >
                       {s.label}
                     </span>
@@ -498,24 +519,6 @@ export default function NuevaPublicacionPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                      Categoría
-                    </label>
-                    <select
-                      id="category"
-                      {...register('category')}
-                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-                    >
-                      <option value="">Seleccionar categoría</option>
-                      {JOB_CATEGORIES.map((cat) => (
-                        <option key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
                     <label htmlFor="experienceLevel" className="block text-sm font-medium text-gray-700">
                       Nivel de Experiencia *
                     </label>
@@ -534,6 +537,43 @@ export default function NuevaPublicacionPage() {
                       <p className="mt-1 text-sm text-red-600">{errors.experienceLevel.message}</p>
                     )}
                   </div>
+                  <div>
+                    <label htmlFor="schedule" className="block text-sm font-medium text-gray-700">
+                      Horario
+                    </label>
+                    <select
+                      id="schedule"
+                      {...register('schedule')}
+                      className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    >
+                      <option value="">Seleccionar horario</option>
+                      {JOB_SCHEDULES.map((s) => (
+                        <option key={s.value} value={s.value}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+
+                </div>
+
+                <div>
+                  <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                    Categoría
+                  </label>
+                  <select
+                    id="category"
+                    {...register('category')}
+                    className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                  >
+                    <option value="">Seleccionar categoría</option>
+                    {JOB_CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -544,10 +584,12 @@ export default function NuevaPublicacionPage() {
                     <div className="relative mt-1">
                       <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         id="minSalary"
                         placeholder="0"
-                        {...register('minSalary', { valueAsNumber: true, min: 0 })}
+                        value={formatSalary(minSalaryValue)}
+                        onChange={(e) => handleSalaryChange('minSalary', e.target.value)}
                         className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                       />
                     </div>
@@ -560,10 +602,12 @@ export default function NuevaPublicacionPage() {
                     <div className="relative mt-1">
                       <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         id="maxSalary"
                         placeholder="0"
-                        {...register('maxSalary', { valueAsNumber: true, min: 0 })}
+                        value={formatSalary(maxSalaryValue)}
+                        onChange={(e) => handleSalaryChange('maxSalary', e.target.value)}
                         className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                       />
                     </div>
@@ -701,11 +745,10 @@ export default function NuevaPublicacionPage() {
                         setPromoSelected(true);
                         setSelectedPlan(null);
                       }}
-                      className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${
-                        promoSelected
-                          ? 'border-green-500 bg-gradient-to-br from-green-600 to-emerald-700 ring-1 ring-green-500'
-                          : 'border-green-300 bg-gradient-to-br from-green-600 to-emerald-700 hover:border-green-400'
-                      }`}
+                      className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${promoSelected
+                        ? 'border-green-500 bg-gradient-to-br from-green-600 to-emerald-700 ring-1 ring-green-500'
+                        : 'border-green-300 bg-gradient-to-br from-green-600 to-emerald-700 hover:border-green-400'
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -747,11 +790,10 @@ export default function NuevaPublicacionPage() {
                           setSelectedPlan(plan);
                           setPromoSelected(false);
                         }}
-                        className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${
-                          isSelected
-                            ? 'border-primary-600 bg-primary-50 ring-1 ring-primary-600'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}
+                        className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${isSelected
+                          ? 'border-primary-600 bg-primary-50 ring-1 ring-primary-600'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <h3 className="text-base font-bold text-gray-900">{plan.name}</h3>
@@ -856,9 +898,8 @@ export default function NuevaPublicacionPage() {
                 <button
                   onClick={handleClaimPromo}
                   disabled={claimingPromo}
-                  className={`w-full rounded-lg bg-green-600 py-3 text-sm font-bold text-white shadow transition-all hover:bg-green-700 ${
-                    claimingPromo ? 'cursor-not-allowed opacity-50' : ''
-                  }`}
+                  className={`w-full rounded-lg bg-green-600 py-3 text-sm font-bold text-white shadow transition-all hover:bg-green-700 ${claimingPromo ? 'cursor-not-allowed opacity-50' : ''
+                    }`}
                 >
                   {claimingPromo ? (
                     <span className="flex items-center justify-center gap-2">
@@ -966,7 +1007,7 @@ export default function NuevaPublicacionPage() {
               </div>
             )}
 
-            
+
           </div>
         )}
 
