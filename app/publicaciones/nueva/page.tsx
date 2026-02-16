@@ -9,6 +9,8 @@ import { subscriptionService } from '@/services/subscriptionService';
 import { paymentService } from '@/services/paymentService';
 import { promotionService } from '@/services/promotionService';
 import { Job, Plan, LaunchTrialStatus } from '@/types';
+import { httpClient } from '@/lib/httpClient';
+import { API_ENDPOINTS } from '@/lib/api';
 import toast from 'react-hot-toast';
 import {
   CheckIcon,
@@ -87,7 +89,7 @@ const EXPERIENCE_LEVELS = [
   { value: 'SENIOR', label: 'Senior' },
 ];
 
-const JOB_SCHEDULES = [
+const JOB_SCHEDULES_FALLBACK = [
   { value: 'MANANA', label: 'Mañana' },
   { value: 'TARDE', label: 'Tarde' },
   { value: 'NOCHE', label: 'Noche' },
@@ -114,6 +116,7 @@ export default function NuevaPublicacionPage() {
   const [promoStatus, setPromoStatus] = useState<LaunchTrialStatus | null>(null);
   const [promoSelected, setPromoSelected] = useState(false);
   const [claimingPromo, setClaimingPromo] = useState(false);
+  const [scheduleOptions, setScheduleOptions] = useState<{ value: string; label: string }[]>(JOB_SCHEDULES_FALLBACK);
 
   const {
     register,
@@ -179,7 +182,27 @@ export default function NuevaPublicacionPage() {
 
   useEffect(() => {
     loadPlans();
+    loadCatalogs();
   }, []);
+
+  const loadCatalogs = async () => {
+    try {
+      const response = await httpClient.get<{
+        data: {
+          jobSchedules?: Array<{ code: string; label: string }>;
+        };
+      }>(API_ENDPOINTS.CATALOGS.GET('es'));
+      const data = response.data;
+      if (data.jobSchedules && data.jobSchedules.length > 0) {
+        setScheduleOptions(
+          data.jobSchedules.map((s) => ({ value: s.code, label: s.label }))
+        );
+      }
+    } catch (error) {
+      console.error('Error cargando catálogos:', error);
+      // Se mantiene el fallback hardcodeado
+    }
+  };
 
   const loadPlans = async () => {
     setLoadingPlans(true);
@@ -547,7 +570,7 @@ export default function NuevaPublicacionPage() {
                       className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                     >
                       <option value="">Seleccionar horario</option>
-                      {JOB_SCHEDULES.map((s) => (
+                      {scheduleOptions.map((s) => (
                         <option key={s.value} value={s.value}>
                           {s.label}
                         </option>
