@@ -117,7 +117,7 @@ export default function ScheduleVideoMeetingModal({
         toast.success('Videollamada agendada exitosamente');
         toast.error(
           meeting.warning ||
-            'No se pudo crear el evento en Google Calendar. Puede que necesites reconectar tu cuenta.',
+          'No se pudo crear el evento en Google Calendar. Puede que necesites reconectar tu cuenta.',
           { duration: 8000, icon: '⚠️' }
         );
       } else {
@@ -233,7 +233,7 @@ export default function ScheduleVideoMeetingModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4 text-black">
           {/* Título */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
