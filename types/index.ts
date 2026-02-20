@@ -200,6 +200,7 @@ export interface Message {
   fromUserId: string;
   toUserId: string;
   content: string;
+  isDelivered: boolean;
   isRead: boolean;
   createdAt: string;
   fromUser?: ApiUserInfo;

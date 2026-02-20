@@ -221,6 +221,30 @@ export default function LoginPage() {
               Registrá tu empresa
             </Link>
           </p>
+
+          {/* Links legales - requerido por verificación Google OAuth */}
+          <div className="pt-4 border-t border-gray-100">
+            <p className="text-center text-xs text-gray-400">
+              Al iniciar sesión, aceptás nuestros{' '}
+              <a
+                href="https://web.trabajo-ya.com/public/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-500 hover:underline"
+              >
+                Términos y Condiciones
+              </a>{' '}
+              y la{' '}
+              <a
+                href="https://web.trabajo-ya.com/public/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-500 hover:underline"
+              >
+                Política de Privacidad
+              </a>
+            </p>
+          </div>
         </div>
       </div>
 

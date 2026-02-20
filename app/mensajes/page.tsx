@@ -351,8 +351,12 @@ function MensajesContent() {
                                   {formatTime(message.createdAt)}
                                 </span>
                                 {isOwn && (
-                                  <span className={`text-[10px] ${message.isRead ? 'text-green-300' : 'text-blue-300'}`}>
-                                    {message.isRead ? (
+                                  <span className={`text-[10px] ${
+                                    message.isRead
+                                      ? 'text-green-300'   // ✓✓ verde = leído
+                                      : 'text-blue-300'    // ✓ o ✓✓ azul claro
+                                  }`}>
+                                    {message.isRead || message.isDelivered ? (
                                       <span className="flex items-center">
                                         <CheckIcon className="h-3 w-3" />
                                         <CheckIcon className="-ml-1.5 h-3 w-3" />
