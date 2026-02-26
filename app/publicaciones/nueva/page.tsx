@@ -323,7 +323,7 @@ export default function NuevaPublicacionPage() {
 
       await paymentService.confirmJobPayment(createdJob.id, orderId);
       setStep('success');
-      toast.success('¡Pago realizado! Tu publicación está siendo revisada.');
+      toast.success('¡Pago realizado! Tu publicación quedó aprobada y activa.');
     } catch (error: any) {
       const msg = error?.response?.data?.message || 'Error al confirmar el pago';
       setPaymentError(msg);
@@ -1045,7 +1045,7 @@ export default function NuevaPublicacionPage() {
             </h2>
             <p className="mt-2 text-sm text-gray-600">
               {needsPayment
-                ? 'Tu publicación ha sido pagada y publicada exitosamente. Nuestro equipo la revisará para asegurar que cumple con nuestras políticas.'
+                ? 'Tu publicación ha sido pagada, aprobada y publicada exitosamente.'
                 : 'Tu publicación ha sido creada y está siendo revisada. Te notificaremos cuando sea aprobada.'}
             </p>
             {createdJob && (
