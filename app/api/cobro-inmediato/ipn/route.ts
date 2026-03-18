@@ -55,8 +55,36 @@ function extractField(body: any, paths: string[]): string | null {
   return null;
 }
 
+function extractOrderIdFromConcept(rawConcept: unknown): string | null {
+  const concept = String(rawConcept || "").trim();
+  if (!concept) return null;
+
+  const orderPattern =
+    /(?:^|[|,;\s])(?:ORDER|ORDER_ID|PAYMENT_ORDER_ID|PAYMENTORDERID)\s*[:=]\s*([A-Za-z0-9\-_]+)/i;
+  const orderMatch = concept.match(orderPattern);
+  if (orderMatch?.[1]) return orderMatch[1].trim();
+
+  // Si concept viene solo con el orderId (ej: UUID), usarlo directo.
+  if (!concept.includes(" ")) {
+    return concept;
+  }
+
+  return null;
+}
+
+function extractJobIdFromConcept(rawConcept: unknown): string | null {
+  const concept = String(rawConcept || "").trim();
+  if (!concept) return null;
+
+  const jobPattern = /(?:^|[|,;\s])JOB(?:_ID)?\s*[:=]\s*([A-Za-z0-9\-_]+)/i;
+  const jobMatch = concept.match(jobPattern);
+  if (jobMatch?.[1]) return jobMatch[1].trim();
+
+  return null;
+}
+
 function extractOrderId(body: any): string | null {
-  return extractField(body, [
+  const direct = extractField(body, [
     "orderId",
     "order_id",
     "payload.orderId",
@@ -70,10 +98,26 @@ function extractOrderId(body: any): string | null {
     "metadata.orderId",
     "meta.orderId",
   ]);
+
+  if (direct) return direct;
+
+  const concept = extractField(body, [
+    "concept",
+    "payload.concept",
+    "data.concept",
+    "resource.concept",
+    "resource.metadata.concept",
+    "metadata.concept",
+    "meta.concept",
+    "query_ticket_text",
+    "payload.query_ticket_text",
+    "data.query_ticket_text",
+  ]);
+  return extractOrderIdFromConcept(concept);
 }
 
 function extractJobId(body: any): string | null {
-  return extractField(body, [
+  const direct = extractField(body, [
     "jobId",
     "job_id",
     "payload.jobId",
@@ -83,6 +127,19 @@ function extractJobId(body: any): string | null {
     "metadata.jobId",
     "meta.jobId",
   ]);
+
+  if (direct) return direct;
+
+  const concept = extractField(body, [
+    "concept",
+    "payload.concept",
+    "data.concept",
+    "resource.concept",
+    "resource.metadata.concept",
+    "metadata.concept",
+    "meta.concept",
+  ]);
+  return extractJobIdFromConcept(concept);
 }
 
 function detectPaymentState(body: any): "confirm" | "reject" | "pending" {
@@ -162,6 +219,7 @@ function buildDebugSnapshot(body: any): Record<string, unknown> {
     "job_id",
     "reference",
     "external_reference",
+    "concept",
     "amount",
     "importe",
     "cod_cliente",
