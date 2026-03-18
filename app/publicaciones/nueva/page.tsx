@@ -137,7 +137,6 @@ export default function NuevaPublicacionPage() {
     setValue,
     watch,
     setError,
-    clearErrors,
     formState: { errors },
   } = useForm<JobFormData>({
     defaultValues: {
@@ -797,23 +796,12 @@ export default function NuevaPublicacionPage() {
                         type="text"
                         inputMode="numeric"
                         id="minSalary"
-                        {...register('minSalary', {
-                          validate: (value) =>
-                            value >= 0 || 'El salario mínimo no puede ser negativo',
-                        })}
                         placeholder="0"
                         value={formatSalary(minSalaryValue)}
-                        onChange={(e) => {
-                          clearErrors('minSalary');
-                          clearErrors('maxSalary');
-                          handleSalaryChange('minSalary', e.target.value);
-                        }}
+                        onChange={(e) => handleSalaryChange('minSalary', e.target.value)}
                         className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                       />
                     </div>
-                    {errors.minSalary && (
-                      <p className="mt-1 text-sm text-red-600">{errors.minSalary.message}</p>
-                    )}
                   </div>
 
                   <div>
@@ -826,21 +814,9 @@ export default function NuevaPublicacionPage() {
                         type="text"
                         inputMode="numeric"
                         id="maxSalary"
-                        {...register('maxSalary', {
-                          validate: (value) => {
-                            if (value < 0) return 'El salario máximo no puede ser negativo';
-                            if (value > 0 && minSalaryValue > 0 && value < minSalaryValue) {
-                              return 'El salario máximo debe ser mayor o igual al salario mínimo';
-                            }
-                            return true;
-                          },
-                        })}
                         placeholder="0"
                         value={formatSalary(maxSalaryValue)}
-                        onChange={(e) => {
-                          clearErrors('maxSalary');
-                          handleSalaryChange('maxSalary', e.target.value);
-                        }}
+                        onChange={(e) => handleSalaryChange('maxSalary', e.target.value)}
                         className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                       />
                     </div>
