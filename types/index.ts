@@ -57,6 +57,7 @@ export interface Job {
   paymentAmount?: number;
   paymentCurrency?: string;
   paymentStatus?: string;
+  coinPaymentLinkUrl?: string;
   paidAt?: string;
   // Entitlements (from backend)
   entitlements?: Array<{

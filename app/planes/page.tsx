@@ -17,6 +17,12 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
+const getPlanPriceUsd = (plan: any): number =>
+  Number(plan?.priceUsd ?? plan?.price) || 0;
+
+const getPlanPriceArs = (plan: any): number =>
+  Number(plan?.priceArs ?? plan?.price) || 0;
+
 export default function PlanesPage() {
   const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -44,7 +50,10 @@ export default function PlanesPage() {
       const plansArray = Array.isArray(plansData) ? plansData : [];
       const activePlans = plansArray
         .filter((p: any) => p.isActive !== false)
-        .sort((a: Plan, b: Plan) => (a.order || 0) - (b.order || 0) || a.price - b.price);
+        .sort(
+          (a: Plan, b: Plan) =>
+            (a.order || 0) - (b.order || 0) || getPlanPriceArs(a) - getPlanPriceArs(b)
+        );
       setPlans(activePlans);
       setSubscription(subscriptionData);
       setPromoStatus(promoData);
@@ -311,12 +320,18 @@ export default function PlanesPage() {
 
                   {/* Price */}
                   <div className="mt-4">
-                    <span className="text-4xl font-bold text-gray-900">
-                      ${plan.price?.toFixed(2) || '0.00'}
-                    </span>
-                    <span className="text-sm text-gray-500 ml-1">
-                      {plan.currency || 'USD'}
-                    </span>
+                    <div>
+                      <span className="text-4xl font-bold text-gray-900">
+                        ${getPlanPriceArs(plan).toLocaleString('es-AR')}
+                      </span>
+                      <span className="text-sm text-gray-500 ml-1">ARS</span>
+                    </div>
+                    <div className="mt-1">
+                      <span className="text-sm font-semibold text-gray-700">
+                        ${getPlanPriceUsd(plan).toFixed(2)}
+                      </span>
+                      <span className="text-xs text-gray-500 ml-1">USD (PayPal)</span>
+                    </div>
                     <p className="text-xs text-gray-400 mt-1">
                       por publicación · {plan.durationDays || 30} días
                     </p>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { jobService } from '@/services/jobService';
 import { paymentService } from '@/services/paymentService';
+import { subscriptionService } from '@/services/subscriptionService';
 import { Job } from '@/types';
 import {
   PlusIcon,
@@ -37,12 +38,17 @@ type ConfirmModalData = {
 } | null;
 
 export default function PublicacionesPage() {
+  const PENDING_JOB_PLAN_STORAGE_KEY = 'pendingJobPlansByJobId';
+  const [storedPlansByJobId, setStoredPlansByJobId] = useState<Record<string, any>>({});
+  const [planUsdPriceById, setPlanUsdPriceById] = useState<Record<string, number>>({});
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pausingId, setPausingId] = useState<string | null>(null);
   const [payingJobId, setPayingJobId] = useState<string | null>(null);
+  const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<'paypal' | 'pagofacil' | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isProcessingPagoFacilJobId, setIsProcessingPagoFacilJobId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -53,7 +59,33 @@ export default function PublicacionesPage() {
 
   useEffect(() => {
     loadJobs();
+    loadPlanPrices();
+    loadStoredPendingPlans();
   }, []);
+
+  const loadStoredPendingPlans = () => {
+    if (typeof window === 'undefined') return;
+    const storedPlansRaw = localStorage.getItem(PENDING_JOB_PLAN_STORAGE_KEY);
+    const storedPlans = storedPlansRaw ? JSON.parse(storedPlansRaw) : {};
+    setStoredPlansByJobId(storedPlans);
+  };
+
+  const loadPlanPrices = async () => {
+    try {
+      const plans = await subscriptionService.getPlans();
+      const byId: Record<string, number> = {};
+      for (const plan of plans || []) {
+        const planAny = plan as any;
+        const amount = Number(planAny?.priceUsd ?? planAny?.price);
+        if (plan?.id && Number.isFinite(amount) && amount > 0) {
+          byId[plan.id] = amount;
+        }
+      }
+      setPlanUsdPriceById(byId);
+    } catch (error) {
+      console.warn('No se pudieron cargar precios de planes para preview de pago', error);
+    }
+  };
 
   const loadJobs = async () => {
     try {
@@ -160,9 +192,23 @@ export default function PublicacionesPage() {
     });
   };
 
-  const handleCreatePaypalOrder = async (jobId: string): Promise<string> => {
+  const handleCreatePaypalOrder = async (job: Job): Promise<string> => {
     try {
-      const order = await paymentService.createJobPaymentOrder(jobId);
+      const jobAny = job as any;
+      const storedPlanForJob = storedPlansByJobId?.[job.id] || null;
+      const entitlementSelectedPlanId =
+        typeof jobAny?.entitlements?.[0]?.rawPayload?.selectedPlanId === 'string'
+          ? String(jobAny.entitlements[0].rawPayload.selectedPlanId).trim()
+          : null;
+      const inferredPlanId =
+        jobAny?.selectedPlanId ||
+        jobAny?.planId ||
+        jobAny?.plan?.id ||
+        storedPlanForJob?.planId ||
+        entitlementSelectedPlanId ||
+        null;
+
+      const order = await paymentService.createJobPaymentOrder(job.id, inferredPlanId);
       return order.orderId;
     } catch (error: any) {
       const msg = error?.response?.data?.message || 'Error al crear orden de pago';
@@ -171,18 +217,150 @@ export default function PublicacionesPage() {
     }
   };
 
+  const getPreviewPayPalAmount = (job: Job): string => {
+    const jobAny = job as any;
+    const storedPlanForJob = storedPlansByJobId?.[job.id] || null;
+    const entitlementSelectedPlanId =
+      typeof jobAny?.entitlements?.[0]?.rawPayload?.selectedPlanId === 'string'
+        ? String(jobAny.entitlements[0].rawPayload.selectedPlanId).trim()
+        : null;
+    const inferredPlanId =
+      jobAny?.selectedPlanId ||
+      jobAny?.planId ||
+      jobAny?.plan?.id ||
+      storedPlanForJob?.planId ||
+      entitlementSelectedPlanId ||
+      null;
+
+    if (inferredPlanId && Number.isFinite(planUsdPriceById[inferredPlanId])) {
+      return planUsdPriceById[inferredPlanId].toFixed(2);
+    }
+
+    if (Number.isFinite(Number(job.paymentAmount)) && Number(job.paymentAmount) > 0) {
+      return Number(job.paymentAmount).toFixed(2);
+    }
+
+    return '--';
+  };
+
   const handlePaypalApprove = async (jobId: string, data: any) => {
     setIsProcessingPayment(true);
     try {
       await paymentService.confirmJobPayment(jobId, data.orderID);
       toast.success('¡Pago realizado! La publicación está en revisión.');
       setPayingJobId(null);
+      setSelectedPaymentGateway(null);
       loadJobs();
     } catch (error: any) {
       const msg = error?.response?.data?.message || 'Error al confirmar pago';
       toast.error(msg);
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  const handleSelectPaymentGateway = (jobId: string, gateway: 'paypal' | 'pagofacil') => {
+    const isSameSelection = payingJobId === jobId && selectedPaymentGateway === gateway;
+    if (isSameSelection) {
+      setPayingJobId(null);
+      setSelectedPaymentGateway(null);
+      return;
+    }
+
+    setPayingJobId(jobId);
+    setSelectedPaymentGateway(gateway);
+  };
+
+  const handlePagoFacilCheckout = async (job: Job) => {
+    try {
+      setIsProcessingPagoFacilJobId(job.id);
+      const accessToken =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (!accessToken) {
+        toast.error('Sesión expirada. Volvé a iniciar sesión.');
+        return;
+      }
+
+      const normalizeCoinLink = (value: unknown): string =>
+        String(value || '')
+          .trim()
+          .replace(/(?:undefined|null)+$/gi, '');
+
+      const existingCoinLink = normalizeCoinLink((job as any)?.coinPaymentLinkUrl);
+      if (existingCoinLink) {
+        window.open(existingCoinLink, '_blank');
+        return;
+      }
+
+      const jobAny = job as any;
+      const storedPlansRaw =
+        typeof window !== 'undefined'
+          ? localStorage.getItem(PENDING_JOB_PLAN_STORAGE_KEY)
+          : null;
+      const storedPlans = storedPlansRaw ? JSON.parse(storedPlansRaw) : {};
+      const storedPlanForJob = storedPlans?.[job.id] || null;
+      const inferredPlanId =
+        jobAny?.selectedPlanId ||
+        jobAny?.planId ||
+        jobAny?.plan?.id ||
+        storedPlanForJob?.planId ||
+        null;
+      const inferredPlanName =
+        jobAny?.plan?.name ||
+        jobAny?.planName ||
+        jobAny?.selectedPlanName ||
+        storedPlanForJob?.planName ||
+        null;
+
+      if (typeof window !== 'undefined' && (inferredPlanId || inferredPlanName)) {
+        const nextStoredPlans = {
+          ...storedPlans,
+          [job.id]: {
+            planId: inferredPlanId || null,
+            planName: inferredPlanName || null,
+          },
+        };
+        localStorage.setItem(PENDING_JOB_PLAN_STORAGE_KEY, JSON.stringify(nextStoredPlans));
+      }
+
+      const response = await fetch('/api/cobro-inmediato/init', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          jobId: job.id,
+          planId: inferredPlanId,
+          planName: inferredPlanName,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const payload = await response.json().catch(() => null);
+      const redirectUrlRaw =
+        payload?.redirectUrl ||
+        payload?.checkoutUrl ||
+        payload?.url ||
+        payload?.paymentUrl ||
+        '';
+      const redirectUrl = normalizeCoinLink(redirectUrlRaw);
+
+      if (!redirectUrl || typeof redirectUrl !== 'string') {
+        throw new Error('La API no devolvió una URL de redirección válida');
+      }
+
+      window.open(redirectUrl, '_blank');
+    } catch (error: any) {
+      console.error('Error iniciando Pago Fácil:', error);
+      const errorMessage =
+        error?.response?.data?.message || error?.message || 'No se pudo iniciar el pago con Pago Fácil';
+      toast.error(errorMessage);
+    } finally {
+      setIsProcessingPagoFacilJobId(null);
     }
   };
 
@@ -495,9 +673,8 @@ export default function PublicacionesPage() {
                   <div
                     key={job.id}
                     onClick={() => handleViewJobDetail(job)}
-                    className={`cursor-pointer overflow-hidden rounded-lg bg-white shadow hover:shadow-md transition-shadow ${
-                      jobPaused ? 'border-l-4 border-amber-400' : ''
-                    }`}
+                    className={`cursor-pointer overflow-hidden rounded-lg bg-white shadow hover:shadow-md transition-shadow ${jobPaused ? 'border-l-4 border-amber-400' : ''
+                      }`}
                   >
                     <div className="p-4 sm:p-6">
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -551,11 +728,6 @@ export default function PublicacionesPage() {
                                   </p>
                                   <p className="text-xs text-orange-700 mt-0.5">
                                     Esta publicación requiere pago para ser publicada.
-                                    {job.paymentAmount && (
-                                      <span className="font-semibold">
-                                        {' '}Monto: ${job.paymentAmount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {job.paymentCurrency || 'USD'}
-                                      </span>
-                                    )}
                                   </p>
                                 </div>
                               </div>
@@ -602,9 +774,8 @@ export default function PublicacionesPage() {
                             const remaining = getRemainingTime(job);
                             if (remaining && !remaining.isExpired && !jobPaused) {
                               return (
-                                <div className={`mt-2 rounded-lg p-2 flex items-center gap-1.5 ${
-                                  remaining.isUrgent ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-green-800'
-                                }`}>
+                                <div className={`mt-2 rounded-lg p-2 flex items-center gap-1.5 ${remaining.isUrgent ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-green-800'
+                                  }`}>
                                   <ClockIcon className={`h-4 w-4 ${remaining.isUrgent ? 'text-orange-500' : 'text-green-500'}`} />
                                   <span className="text-xs font-medium">{remaining.text}</span>
                                 </div>
@@ -710,15 +881,26 @@ export default function PublicacionesPage() {
 
                             {/* Pagar */}
                             {jobNeedsPayment && (
-                              <button
-                                onClick={() =>
-                                  setPayingJobId(isPayingThis ? null : job.id)
-                                }
-                                className="flex items-center gap-1 rounded-md bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
-                              >
-                                <CreditCardIcon className="h-4 w-4" />
-                                {isPayingThis ? 'Cancelar' : 'Pagar Ahora'}
-                              </button>
+                              <div className="flex flex-col gap-2">
+                                <button
+                                  onClick={() => handleSelectPaymentGateway(job.id, 'paypal')}
+                                  className="flex items-center gap-1 rounded-md bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
+                                >
+                                  <CreditCardIcon className="h-4 w-4" />
+                                  {isPayingThis && selectedPaymentGateway === 'paypal'
+                                    ? 'Cancelar PayPal'
+                                    : 'Pagar con PayPal'}
+                                </button>
+                                <button
+                                  onClick={() => handleSelectPaymentGateway(job.id, 'pagofacil')}
+                                  className="flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                                >
+                                  <CreditCardIcon className="h-4 w-4" />
+                                  {isPayingThis && selectedPaymentGateway === 'pagofacil'
+                                    ? 'Cancelar COIN'
+                                    : 'Pagar con COIN'}
+                                </button>
+                              </div>
                             )}
 
                             {/* Editar */}
@@ -781,55 +963,84 @@ export default function PublicacionesPage() {
                           </div>
 
                           {/* Inline PayPal Payment */}
-                          {isPayingThis && paypalClientId && paypalClientId !== 'YOUR_PAYPAL_CLIENT_ID_HERE' && (
-                            <div className="mt-3 w-full sm:w-72">
-                              <PayPalScriptProvider
-                                options={{
-                                  clientId: paypalClientId,
-                                  currency: job.paymentCurrency || 'USD',
-                                  intent: 'capture',
-                                }}
-                              >
-                                <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
-                                  <p className="text-xs text-gray-500 mb-2 text-center">
-                                    Pago: ${job.paymentAmount?.toFixed(2) || '10.00'}{' '}
-                                    {job.paymentCurrency || 'USD'}
-                                  </p>
-                                  <PayPalButtons
-                                    style={{
-                                      layout: 'vertical',
-                                      color: 'blue',
-                                      shape: 'rect',
-                                      label: 'pay',
-                                      height: 40,
-                                    }}
-                                    disabled={isProcessingPayment}
-                                    createOrder={async () => {
-                                      return await handleCreatePaypalOrder(job.id);
-                                    }}
-                                    onApprove={async (data) => {
-                                      await handlePaypalApprove(job.id, data);
-                                    }}
-                                    onError={(error) => {
-                                      console.error('PayPal error:', error);
-                                      toast.error('Error en PayPal');
-                                    }}
-                                    onCancel={() => {
-                                      toast('Pago cancelado', { icon: '⚠️' });
-                                    }}
-                                  />
-                                </div>
-                              </PayPalScriptProvider>
-                            </div>
-                          )}
+                          {isPayingThis &&
+                            selectedPaymentGateway === 'paypal' &&
+                            paypalClientId &&
+                            paypalClientId !== 'YOUR_PAYPAL_CLIENT_ID_HERE' && (
+                              <div className="mt-3 w-full sm:w-72">
+                                <PayPalScriptProvider
+                                  options={{
+                                    clientId: paypalClientId,
+                                    currency: job.paymentCurrency || 'USD',
+                                    intent: 'capture',
+                                  }}
+                                >
+                                  <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
+                                    <p className="text-xs text-gray-500 mb-2 text-center">
+                                      Pago: ${getPreviewPayPalAmount(job)}{' '}
+                                      {job.paymentCurrency || 'USD'}
+                                    </p>
+                                    <PayPalButtons
+                                      style={{
+                                        layout: 'vertical',
+                                        color: 'blue',
+                                        shape: 'rect',
+                                        label: 'pay',
+                                        height: 40,
+                                      }}
+                                      disabled={isProcessingPayment}
+                                      createOrder={async () => {
+                                        return await handleCreatePaypalOrder(job);
+                                      }}
+                                      onApprove={async (data) => {
+                                        await handlePaypalApprove(job.id, data);
+                                      }}
+                                      onError={(error) => {
+                                        console.error('PayPal error:', error);
+                                        toast.error('Error en PayPal');
+                                      }}
+                                      onCancel={() => {
+                                        toast('Pago cancelado', { icon: '⚠️' });
+                                      }}
+                                    />
+                                  </div>
+                                </PayPalScriptProvider>
+                              </div>
+                            )}
 
-                          {isPayingThis && (!paypalClientId || paypalClientId === 'YOUR_PAYPAL_CLIENT_ID_HERE') && (
-                            <div className="mt-3 w-full sm:w-72 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+                          {isPayingThis &&
+                            selectedPaymentGateway === 'paypal' &&
+                            (!paypalClientId || paypalClientId === 'YOUR_PAYPAL_CLIENT_ID_HERE') && (
+                              <div className="mt-3 w-full sm:w-72 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+                                <div className="flex items-start">
+                                  <ExclamationTriangleIcon className="h-4 w-4 text-yellow-500 mr-1.5 flex-shrink-0 mt-0.5" />
+                                  <p className="text-xs text-yellow-700">
+                                    PayPal no configurado. Configura el Client ID en .env.local
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                          {/* Inline Pago Fácil Payment */}
+                          {isPayingThis && selectedPaymentGateway === 'pagofacil' && (
+                            <div className="mt-3 w-full sm:w-72 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                               <div className="flex items-start">
-                                <ExclamationTriangleIcon className="h-4 w-4 text-yellow-500 mr-1.5 flex-shrink-0 mt-0.5" />
-                                <p className="text-xs text-yellow-700">
-                                  PayPal no configurado. Configura el Client ID en .env.local
-                                </p>
+                                <CreditCardIcon className="h-4 w-4 text-emerald-600 mr-1.5 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-xs font-semibold text-emerald-800">
+                                    Cobro Inmediato
+                                  </p>
+                                  <p className="text-xs text-emerald-700 mt-1">
+                                    Vas a continuar el pago en la pasarela de Cobro Inmediato.
+                                  </p>
+                                  <button
+                                    onClick={() => handlePagoFacilCheckout(job)}
+                                    disabled={isProcessingPagoFacilJobId === job.id}
+                                    className="mt-2 w-full rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {isProcessingPagoFacilJobId === job.id ? 'Procesando...' : 'Continuar con el pago'}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -895,13 +1106,12 @@ export default function PublicacionesPage() {
               </button>
               <button
                 onClick={confirmModal.onConfirm}
-                className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold text-white transition-colors ${
-                  confirmModal.confirmColor === 'red'
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : confirmModal.confirmColor === 'yellow'
+                className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold text-white transition-colors ${confirmModal.confirmColor === 'red'
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : confirmModal.confirmColor === 'yellow'
                     ? 'bg-amber-600 hover:bg-amber-700'
                     : 'bg-green-600 hover:bg-green-700'
-                }`}
+                  }`}
               >
                 {confirmModal.confirmLabel}
               </button>

@@ -22,9 +22,10 @@ class PaymentService {
   /**
    * Crear orden de pago PayPal para un empleo específico
    */
-  async createJobPaymentOrder(jobId: string): Promise<PaymentOrder> {
+  async createJobPaymentOrder(jobId: string, planId?: string | null): Promise<PaymentOrder> {
     const response = await httpClient.post<{ data: PaymentOrder }>(
-      API_ENDPOINTS.EMPRESAS.CREATE_JOB_PAYMENT(jobId)
+      API_ENDPOINTS.EMPRESAS.CREATE_JOB_PAYMENT(jobId),
+      planId ? { planId } : {}
     );
     return response.data;
   }

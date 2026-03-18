@@ -83,6 +83,10 @@ const JOB_CATEGORIES = [
   { value: 'NAVIERA_MARITIMA_PORTUARIA', label: 'Naviero, Marítimo, Portuario' },
 ];
 
+const SORTED_JOB_CATEGORIES = [...JOB_CATEGORIES].sort((a, b) =>
+  a.label.localeCompare(b.label, 'es', { sensitivity: 'base' })
+);
+
 const EXPERIENCE_LEVELS = [
   { value: 'JUNIOR', label: 'Junior' },
   { value: 'SEMISENIOR', label: 'Semi Senior' },
@@ -101,7 +105,14 @@ const JOB_SCHEDULES_FALLBACK = [
 
 type Step = 'form' | 'payment' | 'success';
 
+const getPlanPriceUsd = (plan: any): number =>
+  Number(plan?.priceUsd ?? plan?.price) || 0;
+
+const getPlanPriceArs = (plan: any): number =>
+  Number(plan?.priceArs ?? plan?.price) || 0;
+
 export default function NuevaPublicacionPage() {
+  const PENDING_JOB_PLAN_STORAGE_KEY = 'pendingJobPlansByJobId';
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<Step>('form');
@@ -112,17 +123,21 @@ export default function NuevaPublicacionPage() {
   const [paypalOrderId, setPaypalOrderId] = useState<string | null>(null);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isProcessingCoinPayment, setIsProcessingCoinPayment] = useState(false);
   const [needsPayment, setNeedsPayment] = useState(false);
   const [promoStatus, setPromoStatus] = useState<LaunchTrialStatus | null>(null);
   const [promoSelected, setPromoSelected] = useState(false);
   const [claimingPromo, setClaimingPromo] = useState(false);
   const [scheduleOptions, setScheduleOptions] = useState<{ value: string; label: string }[]>(JOB_SCHEDULES_FALLBACK);
+  const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     setValue,
     watch,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<JobFormData>({
     defaultValues: {
@@ -215,7 +230,10 @@ export default function NuevaPublicacionPage() {
       // Filtrar solo planes activos y ordenar por precio
       const activePlans = plansArray
         .filter((p: any) => p.isActive !== false)
-        .sort((a: Plan, b: Plan) => (a.order || 0) - (b.order || 0) || a.price - b.price);
+        .sort(
+          (a: Plan, b: Plan) =>
+            (a.order || 0) - (b.order || 0) || getPlanPriceArs(a) - getPlanPriceArs(b)
+        );
       setPlans(activePlans);
       setPromoStatus(promoData);
 
@@ -234,9 +252,47 @@ export default function NuevaPublicacionPage() {
     }
   };
 
+  const persistPendingJobPlan = (jobId: string, plan: { id?: string | null; name?: string | null } | null) => {
+    if (typeof window === 'undefined' || !jobId) return;
+    const storedPlansRaw = localStorage.getItem(PENDING_JOB_PLAN_STORAGE_KEY);
+    const storedPlans = storedPlansRaw ? JSON.parse(storedPlansRaw) : {};
+    const nextStoredPlans = {
+      ...storedPlans,
+      [jobId]: {
+        planId: plan?.id || null,
+        planName: plan?.name || null,
+      },
+    };
+    localStorage.setItem(PENDING_JOB_PLAN_STORAGE_KEY, JSON.stringify(nextStoredPlans));
+  };
+
   const onSubmit = async (data: JobFormData) => {
+    setFormSubmitError(null);
+
+    if (data.minSalary > 0 && data.maxSalary > 0 && data.maxSalary < data.minSalary) {
+      setError('maxSalary', {
+        type: 'validate',
+        message: 'El salario máximo debe ser mayor o igual al salario mínimo',
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
+      if (loadingPlans) {
+        const message = 'Todavía estamos cargando los planes. Intenta nuevamente en unos segundos.';
+        setFormSubmitError(message);
+        throw new Error(message);
+      }
+
+      const planForCreation = selectedPlan || plans[0] || null;
+
+      if (!planForCreation) {
+        const message = 'No se pudo determinar el plan para la publicación. Recargá la página e intenta nuevamente.';
+        setFormSubmitError(message);
+        throw new Error(message);
+      }
+
       const provincia = data.location.trim();
       const localidad = data.localidad?.trim() || '';
       const locationStr = localidad ? `${localidad}, ${provincia}` : provincia;
@@ -262,12 +318,17 @@ export default function NuevaPublicacionPage() {
       if (data.maxSalary > 0) jobData.maxSalary = data.maxSalary;
 
       // Enviar planId si hay un plan seleccionado
-      if (selectedPlan?.id) {
-        jobData.planId = selectedPlan.id;
+      if (planForCreation?.id) {
+        jobData.planId = planForCreation.id;
       }
 
       const job = await jobService.createJob(jobData);
       setCreatedJob(job);
+
+      persistPendingJobPlan(job.id, {
+        id: planForCreation?.id || null,
+        name: planForCreation?.name || null,
+      });
 
       // Verificar si el empleo necesita pago
       if (job.moderationStatus === 'PENDING_PAYMENT' || job.paymentStatus === 'PENDING' || !job.isPaid) {
@@ -280,7 +341,9 @@ export default function NuevaPublicacionPage() {
         toast.success('¡Publicación creada exitosamente!');
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Error al crear publicación');
+      const message = error?.response?.data?.message || 'Error al crear publicación';
+      setFormSubmitError(message);
+      toast.error(message);
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -296,7 +359,33 @@ export default function NuevaPublicacionPage() {
     setPaymentError(null);
 
     try {
-      const order = await paymentService.createJobPaymentOrder(createdJob.id);
+      if (createdJob?.id && selectedPlan?.id) {
+        persistPendingJobPlan(createdJob.id, {
+          id: selectedPlan.id,
+          name: selectedPlan.name || null,
+        });
+      }
+
+      const createdJobAny = createdJob as any;
+      const storedPlansRaw =
+        typeof window !== 'undefined' ? localStorage.getItem(PENDING_JOB_PLAN_STORAGE_KEY) : null;
+      const storedPlans = storedPlansRaw ? JSON.parse(storedPlansRaw) : {};
+      const storedPlanForJob = storedPlans?.[createdJob.id] || null;
+      const entitlementSelectedPlanId =
+        typeof createdJobAny?.entitlements?.[0]?.rawPayload?.selectedPlanId === 'string'
+          ? String(createdJobAny.entitlements[0].rawPayload.selectedPlanId).trim()
+          : null;
+      const inferredPlanId =
+        selectedPlan?.id ||
+        storedPlanForJob?.planId ||
+        createdJobAny?.selectedPlanId ||
+        entitlementSelectedPlanId ||
+        null;
+
+      const order = await paymentService.createJobPaymentOrder(
+        createdJob.id,
+        inferredPlanId
+      );
       setPaypalOrderId(order.orderId);
       return order.orderId;
     } catch (error: any) {
@@ -339,6 +428,77 @@ export default function NuevaPublicacionPage() {
     toast.error('Error en PayPal. Intenta nuevamente.');
   };
 
+  const handleCoinPayment = async () => {
+    if (!createdJob?.id) return;
+
+    try {
+      setIsProcessingCoinPayment(true);
+      setPaymentError(null);
+
+      const accessToken =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (!accessToken) {
+        throw new Error('Sesión expirada. Volvé a iniciar sesión.');
+      }
+
+      if (typeof window !== 'undefined' && selectedPlan) {
+        const storedPlansRaw = localStorage.getItem(PENDING_JOB_PLAN_STORAGE_KEY);
+        const storedPlans = storedPlansRaw ? JSON.parse(storedPlansRaw) : {};
+        const nextStoredPlans = {
+          ...storedPlans,
+          [createdJob.id]: {
+            planId: selectedPlan.id || null,
+            planName: selectedPlan.name || null,
+          },
+        };
+        localStorage.setItem(PENDING_JOB_PLAN_STORAGE_KEY, JSON.stringify(nextStoredPlans));
+      }
+
+      const response = await fetch('/api/cobro-inmediato/init', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          jobId: createdJob.id,
+          planId: selectedPlan?.id || null,
+          planName: selectedPlan?.name || null,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.message || `Error HTTP ${response.status}`);
+      }
+
+      const normalizeCoinLink = (value: unknown): string =>
+        String(value || '')
+          .trim()
+          .replace(/(?:undefined|null)+$/gi, '');
+
+      const redirectUrlRaw =
+        payload?.redirectUrl ||
+        payload?.checkoutUrl ||
+        payload?.url ||
+        payload?.paymentUrl;
+      const redirectUrl = normalizeCoinLink(redirectUrlRaw);
+
+      if (!redirectUrl || typeof redirectUrl !== 'string') {
+        throw new Error('La pasarela no devolvió una URL de pago válida.');
+      }
+
+      window.location.href = redirectUrl;
+    } catch (error: any) {
+      const message =
+        error?.message || error?.response?.data?.message || 'No se pudo iniciar el pago con COIN.';
+      setPaymentError(message);
+      toast.error(message);
+    } finally {
+      setIsProcessingCoinPayment(false);
+    }
+  };
+
   const handleClaimPromo = async () => {
     if (!createdJob?.id) return;
     try {
@@ -370,6 +530,15 @@ export default function NuevaPublicacionPage() {
 
   return (
     <Layout>
+      <style jsx global>{`
+        .paypal-powered-by.powered-by-paypal-legacy {
+          display: none !important;
+        }
+
+        .paypal-button-container {
+          margin: auto !important;
+        }
+      `}</style>
       <div className="mx-auto max-w-4xl">
         {/* Header */}
         <div className="mb-6">
@@ -452,7 +621,19 @@ export default function NuevaPublicacionPage() {
                   <input
                     type="text"
                     id="title"
-                    {...register('title', { required: 'El título es requerido' })}
+                    {...register('title', {
+                      required: 'El título es requerido',
+                      minLength: {
+                        value: 5,
+                        message: 'El título debe tener al menos 5 caracteres',
+                      },
+                      maxLength: {
+                        value: 120,
+                        message: 'El título no puede superar los 120 caracteres',
+                      },
+                      validate: (value) =>
+                        value.trim().length >= 5 || 'El título debe tener al menos 5 caracteres',
+                    })}
                     className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                   />
                   {errors.title && (
@@ -566,7 +747,7 @@ export default function NuevaPublicacionPage() {
                     </label>
                     <select
                       id="schedule"
-                      {...register('schedule')}
+                      {...register('schedule', { required: 'El horario es requerido' })}
                       className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                     >
                       <option value="">Seleccionar horario</option>
@@ -576,6 +757,9 @@ export default function NuevaPublicacionPage() {
                         </option>
                       ))}
                     </select>
+                    {errors.schedule && (
+                      <p className="mt-1 text-sm text-red-600">{errors.schedule.message}</p>
+                    )}
                   </div>
 
 
@@ -587,16 +771,19 @@ export default function NuevaPublicacionPage() {
                   </label>
                   <select
                     id="category"
-                    {...register('category')}
+                    {...register('category', { required: 'La categoría es requerida' })}
                     className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                   >
                     <option value="">Seleccionar categoría</option>
-                    {JOB_CATEGORIES.map((cat) => (
+                    {SORTED_JOB_CATEGORIES.map((cat) => (
                       <option key={cat.value} value={cat.value}>
                         {cat.label}
                       </option>
                     ))}
                   </select>
+                  {errors.category && (
+                    <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -610,12 +797,23 @@ export default function NuevaPublicacionPage() {
                         type="text"
                         inputMode="numeric"
                         id="minSalary"
+                        {...register('minSalary', {
+                          validate: (value) =>
+                            value >= 0 || 'El salario mínimo no puede ser negativo',
+                        })}
                         placeholder="0"
                         value={formatSalary(minSalaryValue)}
-                        onChange={(e) => handleSalaryChange('minSalary', e.target.value)}
+                        onChange={(e) => {
+                          clearErrors('minSalary');
+                          clearErrors('maxSalary');
+                          handleSalaryChange('minSalary', e.target.value);
+                        }}
                         className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                       />
                     </div>
+                    {errors.minSalary && (
+                      <p className="mt-1 text-sm text-red-600">{errors.minSalary.message}</p>
+                    )}
                   </div>
 
                   <div>
@@ -628,12 +826,27 @@ export default function NuevaPublicacionPage() {
                         type="text"
                         inputMode="numeric"
                         id="maxSalary"
+                        {...register('maxSalary', {
+                          validate: (value) => {
+                            if (value < 0) return 'El salario máximo no puede ser negativo';
+                            if (value > 0 && minSalaryValue > 0 && value < minSalaryValue) {
+                              return 'El salario máximo debe ser mayor o igual al salario mínimo';
+                            }
+                            return true;
+                          },
+                        })}
                         placeholder="0"
                         value={formatSalary(maxSalaryValue)}
-                        onChange={(e) => handleSalaryChange('maxSalary', e.target.value)}
+                        onChange={(e) => {
+                          clearErrors('maxSalary');
+                          handleSalaryChange('maxSalary', e.target.value);
+                        }}
                         className="block w-full bg-white rounded-md border border-gray-300 pl-7 pr-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                       />
                     </div>
+                    {errors.maxSalary && (
+                      <p className="mt-1 text-sm text-red-600">{errors.maxSalary.message}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -648,7 +861,19 @@ export default function NuevaPublicacionPage() {
                 <textarea
                   id="description"
                   rows={8}
-                  {...register('description', { required: 'La descripción es requerida' })}
+                  {...register('description', {
+                    required: 'La descripción es requerida',
+                    minLength: {
+                      value: 30,
+                      message: 'La descripción debe tener al menos 30 caracteres',
+                    },
+                    maxLength: {
+                      value: 5000,
+                      message: 'La descripción no puede superar los 5000 caracteres',
+                    },
+                    validate: (value) =>
+                      value.trim().length >= 30 || 'La descripción debe tener al menos 30 caracteres',
+                  })}
                   className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                 />
                 {errors.description && (
@@ -666,7 +891,19 @@ export default function NuevaPublicacionPage() {
                 <textarea
                   id="requirements"
                   rows={6}
-                  {...register('requirements', { required: 'Los requisitos son requeridos' })}
+                  {...register('requirements', {
+                    required: 'Los requisitos son requeridos',
+                    minLength: {
+                      value: 20,
+                      message: 'Los requisitos deben tener al menos 20 caracteres',
+                    },
+                    maxLength: {
+                      value: 3000,
+                      message: 'Los requisitos no pueden superar los 3000 caracteres',
+                    },
+                    validate: (value) =>
+                      value.trim().length >= 20 || 'Los requisitos deben tener al menos 20 caracteres',
+                  })}
                   className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                 />
                 {errors.requirements && (
@@ -684,11 +921,28 @@ export default function NuevaPublicacionPage() {
                 <textarea
                   id="benefits"
                   rows={4}
-                  {...register('benefits')}
+                  {...register('benefits', {
+                    maxLength: {
+                      value: 3000,
+                      message: 'Los beneficios no pueden superar los 3000 caracteres',
+                    },
+                  })}
                   className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
                 />
+                {errors.benefits && (
+                  <p className="mt-1 text-sm text-red-600">{errors.benefits.message}</p>
+                )}
               </div>
             </div>
+
+            {formSubmitError && (
+              <div className="rounded-lg bg-red-50 p-4">
+                <div className="flex items-start">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-800">{formSubmitError}</p>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
               <button
@@ -767,6 +1021,9 @@ export default function NuevaPublicacionPage() {
                       onClick={() => {
                         setPromoSelected(true);
                         setSelectedPlan(null);
+                        if (createdJob?.id) {
+                          persistPendingJobPlan(createdJob.id, null);
+                        }
                       }}
                       className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${promoSelected
                         ? 'border-green-500 bg-gradient-to-br from-green-600 to-emerald-700 ring-1 ring-green-500'
@@ -812,6 +1069,12 @@ export default function NuevaPublicacionPage() {
                         onClick={() => {
                           setSelectedPlan(plan);
                           setPromoSelected(false);
+                          if (createdJob?.id) {
+                            persistPendingJobPlan(createdJob.id, {
+                              id: plan.id,
+                              name: plan.name || null,
+                            });
+                          }
                         }}
                         className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${isSelected
                           ? 'border-primary-600 bg-primary-50 ring-1 ring-primary-600'
@@ -826,12 +1089,18 @@ export default function NuevaPublicacionPage() {
                         </div>
                         <p className="mt-1 text-xs text-gray-500">{plan.description || ''}</p>
                         <div className="mt-3">
-                          <span className="text-2xl font-bold text-gray-900">
-                            ${plan.price?.toFixed(2) || '0.00'}
-                          </span>
-                          <span className="text-xs text-gray-500 ml-1">
-                            {plan.currency || 'USD'}
-                          </span>
+                          <div>
+                            <span className="text-2xl font-bold text-gray-900">
+                              ${getPlanPriceUsd(plan).toFixed(2)}
+                            </span>
+                            <span className="text-xs text-gray-500 ml-1">USD</span>
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-gray-700">
+                              ${getPlanPriceArs(plan).toLocaleString('es-AR')}
+                            </span>
+                            <span className="text-xs text-gray-500 ml-1">ARS</span>
+                          </div>
                         </div>
                         <div className="mt-3 space-y-1">
                           <p className="text-xs text-gray-600">
@@ -942,10 +1211,7 @@ export default function NuevaPublicacionPage() {
               </div>
             ) : (
               <div className="rounded-lg bg-white p-6 shadow">
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">Pagar con PayPal</h2>
-                <p className="text-sm text-gray-500 mb-6">
-                  Realiza el pago de forma segura con PayPal para publicar tu empleo
-                </p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Elegí tu método de pago</h2>
 
                 {/* Price Summary */}
                 <div className="mb-6 rounded-lg bg-gray-50 p-4">
@@ -961,11 +1227,11 @@ export default function NuevaPublicacionPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-gray-900">
-                        ${selectedPlan?.price?.toFixed(2) || createdJob.paymentAmount?.toFixed(2) || '10.00'}
+                      <p className="text-xl font-bold text-gray-900">
+                        PayPal: ${selectedPlan ? getPlanPriceUsd(selectedPlan).toFixed(2) : createdJob.paymentAmount?.toFixed(2) || '10.00'} USD
                       </p>
-                      <p className="text-xs text-gray-500">
-                        {selectedPlan?.currency || createdJob.paymentCurrency || 'USD'}
+                      <p className="text-sm text-gray-600">
+                        COIN: ${selectedPlan ? getPlanPriceArs(selectedPlan).toLocaleString('es-AR') : '0'} ARS
                       </p>
                     </div>
                   </div>
@@ -980,12 +1246,32 @@ export default function NuevaPublicacionPage() {
                   </div>
                 )}
 
-                {/* PayPal Buttons */}
+                <div className="mb-6">
+                  <button
+                    type="button"
+                    onClick={handleCoinPayment}
+                    disabled={isProcessingCoinPayment || isLoading || isCreatingOrder}
+                    className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-bold text-white shadow transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isProcessingCoinPayment ? 'Procesando COIN...' : 'Pagar con COIN'}
+                  </button>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Serás redirigido a la pasarela de COIN para completar el pago.
+                  </p>
+                </div>
+
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-gray-200" />
+                  <span className="text-xs font-medium uppercase tracking-wide text-gray-400">o</span>
+                  <div className="h-px flex-1 bg-gray-200" />
+                </div>
+
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Pagar con PayPal</h3>
                 {paypalClientId && paypalClientId !== 'YOUR_PAYPAL_CLIENT_ID_HERE' ? (
                   <PayPalScriptProvider
                     options={{
                       clientId: paypalClientId,
-                      currency: createdJob.paymentCurrency || 'USD',
+                      currency: 'USD',
                       intent: 'capture',
                     }}
                   >
