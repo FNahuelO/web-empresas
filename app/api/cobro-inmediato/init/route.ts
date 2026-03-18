@@ -399,8 +399,8 @@ async function ensureBackendPaymentOrderId(
       body: JSON.stringify(
         requestedPlanId
           ? {
-              planId: requestedPlanId,
-            }
+            planId: requestedPlanId,
+          }
           : {}
       ),
       cache: "no-store",
@@ -486,9 +486,6 @@ export async function POST(request: Request) {
     const { job, profile } = await fetchBackendJobAndClientData(userToken, body.jobId);
     const paymentOrderId = await ensureBackendPaymentOrderId(userToken, job, requestedPlanId);
 
-    console.log('job', job);
-    console.log('body', body);
-
     const debtTypeId = Number(process.env.COBRO_INMEDIATO_DEBT_TYPE_ID || 1);
     const expirationDate = process.env.COBRO_INMEDIATO_EXPIRATION_DATE || plusDaysISO(7);
     const title = job.title || 'Publicación de empleo';
@@ -530,9 +527,9 @@ export async function POST(request: Request) {
     const token = await requestAccessToken(username, password);
 
     const queryTicketTextBase = `Plan de publicación: ${planDetail}`;
-    const queryTicketTextTrace = `${queryTicketTextBase} | JOB:${body.jobId}${
-      paymentOrderId ? ` | ORDER:${paymentOrderId}` : ""
-    }`;
+    const queryTicketTextTrace = queryTicketTextBase;
+    const concept = `JOB:${body.jobId}${paymentOrderId ? ` | ORDER:${paymentOrderId}` : ""
+      }`;
 
     const payload = {
       clientId,
@@ -540,6 +537,7 @@ export async function POST(request: Request) {
       amount,
       debt_type_id: debtTypeId,
       query_ticket_text: queryTicketTextTrace,
+      concept: concept,
       expiration_date: expirationDate,
       client_code: clientCode,
       client_name: clientName,

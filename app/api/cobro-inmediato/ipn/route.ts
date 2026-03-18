@@ -86,6 +86,24 @@ function extractJobId(body: any): string | null {
 }
 
 function detectPaymentState(body: any): "confirm" | "reject" | "pending" {
+  const responseCode = safeUpper(
+    extractField(body, [
+      "cod_respuesta",
+      "payload.cod_respuesta",
+      "data.cod_respuesta",
+      "response_code",
+      "payload.response_code",
+      "data.response_code",
+    ])
+  );
+  if (responseCode === "0" || responseCode === "00") {
+    return "confirm";
+  }
+
+  if (responseCode && responseCode !== "0" && responseCode !== "00") {
+    return "reject";
+  }
+
   const status = safeUpper(
     extractField(body, [
       "status",
@@ -96,6 +114,9 @@ function detectPaymentState(body: any): "confirm" | "reject" | "pending" {
       "payload.payment_status",
       "data.status",
       "resource.status",
+      "msg_respuesta",
+      "payload.msg_respuesta",
+      "data.msg_respuesta",
     ])
   );
 
@@ -128,14 +149,64 @@ function detectPaymentState(body: any): "confirm" | "reject" | "pending" {
   return "pending";
 }
 
+function buildDebugSnapshot(body: any): Record<string, unknown> {
+  const keysOfInterest = [
+    "cod_respuesta",
+    "msg_respuesta",
+    "status",
+    "paymentStatus",
+    "payment_status",
+    "orderId",
+    "order_id",
+    "jobId",
+    "job_id",
+    "reference",
+    "external_reference",
+    "amount",
+    "importe",
+    "cod_cliente",
+    "query_ticket_text",
+  ];
+
+  const snapshot: Record<string, unknown> = {};
+  for (const key of keysOfInterest) {
+    if (body?.[key] !== undefined) {
+      snapshot[key] = body[key];
+    }
+  }
+  return snapshot;
+}
+
 export async function POST(request: Request) {
   try {
+    const contentType = request.headers.get("content-type");
+    const userAgent = request.headers.get("user-agent");
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    console.log("[COIN IPN] Request recibida", {
+      method: request.method,
+      contentType,
+      userAgent,
+      forwardedFor,
+    });
+
     const body = await readIncomingBody(request);
     const orderId = extractOrderId(body);
     const jobId = extractJobId(body);
     const state = detectPaymentState(body);
+    const debugSnapshot = buildDebugSnapshot(body);
+
+    console.log("[COIN IPN] Payload parseado", {
+      orderId,
+      jobId,
+      state,
+      snapshot: debugSnapshot,
+    });
 
     if (state === "pending") {
+      console.log("[COIN IPN] Estado pendiente, no se envía a backend", {
+        orderId,
+        jobId,
+      });
       return NextResponse.json({
         ok: true,
         message: "IPN recibido en estado pendiente",
@@ -149,6 +220,14 @@ export async function POST(request: Request) {
       state === "confirm"
         ? `${BACKEND_BASE_URL}/api/payments/ipn/confirm`
         : `${BACKEND_BASE_URL}/api/payments/ipn/reject`;
+
+    console.log("[COIN IPN] Enviando a backend", {
+      backendEndpoint,
+      hasSharedSecret: Boolean(ipnSecret),
+      orderId,
+      jobId,
+      state,
+    });
 
     const backendRes = await fetch(backendEndpoint, {
       method: "POST",
@@ -165,7 +244,23 @@ export async function POST(request: Request) {
     });
 
     const backendPayload = await backendRes.json().catch(() => null);
+    console.log("[COIN IPN] Respuesta backend", {
+      status: backendRes.status,
+      ok: backendRes.ok,
+      body: backendPayload,
+      orderId,
+      jobId,
+      state,
+    });
+
     if (!backendRes.ok) {
+      console.error("[COIN IPN] Error procesando IPN en backend", {
+        status: backendRes.status,
+        backend: backendPayload,
+        orderId,
+        jobId,
+        state,
+      });
       return NextResponse.json(
         {
           ok: false,
@@ -185,6 +280,10 @@ export async function POST(request: Request) {
       backend: backendPayload,
     });
   } catch (error: any) {
+    console.error("[COIN IPN] Error interno", {
+      message: error?.message,
+      stack: error?.stack,
+    });
     return NextResponse.json(
       {
         ok: false,

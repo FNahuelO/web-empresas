@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { httpClient } from '@/lib/httpClient';
@@ -50,12 +50,56 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuthStore();
+  const [checkingSession, setCheckingSession] = useState(true);
+  const { login, isAuthenticated, loadUser } = useAuthStore();
   const router = useRouter();
 
   // Estado del modal de email no verificado
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkPersistedSession = async () => {
+      if (isAuthenticated) {
+        router.replace('/dashboard');
+        if (!cancelled) setCheckingSession(false);
+        return;
+      }
+
+      const safeGet = (key: string): string | null => {
+        try {
+          return localStorage.getItem(key);
+        } catch {
+          return null;
+        }
+      };
+
+      const hasTokens = Boolean(safeGet('accessToken') || safeGet('refreshToken'));
+      const hasUserSnapshot = Boolean(safeGet('authUserSnapshot'));
+
+      if (!hasTokens || !hasUserSnapshot) {
+        if (!cancelled) setCheckingSession(false);
+        return;
+      }
+
+      try {
+        await loadUser();
+        if (!cancelled && useAuthStore.getState().isAuthenticated) {
+          router.replace('/dashboard');
+        }
+      } finally {
+        if (!cancelled) setCheckingSession(false);
+      }
+    };
+
+    checkPersistedSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, loadUser, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,10 +247,14 @@ export default function LoginPage() {
             <div className="pt-4">
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || checkingSession}
                 className="w-full rounded-full bg-secondary-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-secondary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-900 disabled:opacity-50 transition-colors"
               >
-                {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+                {checkingSession
+                  ? 'Verificando sesión...'
+                  : isLoading
+                    ? 'Iniciando sesión...'
+                    : 'Iniciar sesión'}
               </button>
             </div>
           </form>
