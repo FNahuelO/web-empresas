@@ -64,6 +64,12 @@ function extractOrderIdFromConcept(rawConcept: unknown): string | null {
   const orderMatch = concept.match(orderPattern);
   if (orderMatch?.[1]) return orderMatch[1].trim();
 
+  // Soporta formato: "<orderId> | Plan: XXX"
+  const firstSegment = concept.split("|")[0]?.trim();
+  if (/^[A-Za-z0-9][A-Za-z0-9\-_]{8,}$/.test(firstSegment || "")) {
+    return firstSegment || null;
+  }
+
   // Si concept viene solo con el orderId (ej: UUID), usarlo directo.
   if (!concept.includes(" ")) {
     return concept;
@@ -185,6 +191,10 @@ function detectPaymentState(body: any): "confirm" | "reject" | "pending" {
     "PAID",
     "SUCCESS",
     "SUCCEEDED",
+    "EXITOSA",
+    "EXITOSO",
+    "COBRANZA EXITOSA",
+    "COBRANZA EXITOSO",
     "ACREDITADO",
     "APROBADO",
   ];
