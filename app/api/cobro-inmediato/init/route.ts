@@ -526,7 +526,7 @@ export async function POST(request: Request) {
 
     const token = await requestAccessToken(username, password);
 
-    const queryTicketTextBase = `Plan de publicación: ${planDetail}`;
+    const queryTicketTextBase = `${paymentOrderId} | Plan: ${planDetail}`;
     const queryTicketTextTrace = queryTicketTextBase;
     const concept = `JOB:${body.jobId}${paymentOrderId ? ` | ORDER:${paymentOrderId}` : ""
       }`;
