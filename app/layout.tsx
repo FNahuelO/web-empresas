@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import MobileDesktopDisclaimer from "@/components/MobileDesktopDisclaimer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -100,6 +101,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         {children}
+        <MobileDesktopDisclaimer />
         <Toaster position="top-right" />
       </body>
     </html>
