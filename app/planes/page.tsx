@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
@@ -24,7 +24,7 @@ const getPlanPriceUsd = (plan: any): number =>
 const getPlanPriceArs = (plan: any): number =>
   Number(plan?.priceArs ?? plan?.price) || 0;
 
-export default function PlanesPage() {
+function PlanesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -541,5 +541,21 @@ export default function PlanesPage() {
         </div>
       )}
     </Layout>
+  );
+}
+
+export default function PlanesPage() {
+  return (
+    <Suspense
+      fallback={
+        <Layout>
+          <div className="flex items-center justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"></div>
+          </div>
+        </Layout>
+      }
+    >
+      <PlanesPageContent />
+    </Suspense>
   );
 }
