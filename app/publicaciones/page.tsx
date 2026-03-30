@@ -661,7 +661,8 @@ export default function PublicacionesPage() {
           <div className="space-y-4">
             {Array.isArray(jobs) &&
               jobs.map((job) => {
-                const applicantsCount = job._count?.applications || 0;
+                const applicantsCount =
+                  job.applicationsCount ?? job._count?.applications ?? 0;
                 const publishedDate = job.publishedAt || job.fechaPublicacion;
                 const jobNeedsPayment = isPendingPayment(job);
                 const isPayingThis = payingJobId === job.id;

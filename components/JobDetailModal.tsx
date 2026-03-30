@@ -17,7 +17,8 @@ import {
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { jobService } from '@/services/jobService';
 
 interface JobDetailModalProps {
   visible: boolean;
@@ -27,6 +28,28 @@ interface JobDetailModalProps {
 
 export default function JobDetailModal({ visible, job, onClose }: JobDetailModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const [liveApplicantsCount, setLiveApplicantsCount] = useState<number | null>(null);
+
+  // Alinear contador con la misma API que "Ver postulantes" (evita mostrar 0 si el listado falla en _count)
+  useEffect(() => {
+    if (!visible || !job?.id) {
+      setLiveApplicantsCount(null);
+      return;
+    }
+    let cancelled = false;
+    setLiveApplicantsCount(null);
+    jobService
+      .getJobApplicants(job.id)
+      .then((apps) => {
+        if (!cancelled) setLiveApplicantsCount(Array.isArray(apps) ? apps.length : 0);
+      })
+      .catch(() => {
+        if (!cancelled) setLiveApplicantsCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, job?.id]);
 
   // Cerrar con ESC
   useEffect(() => {
@@ -121,7 +144,10 @@ export default function JobDetailModal({ visible, job, onClose }: JobDetailModal
     return formatDistanceToNow(new Date(publishedDate), { addSuffix: true, locale: es });
   };
 
-  const applicantsCount = job._count?.applications || 0;
+  const applicantsCount =
+    liveApplicantsCount !== null
+      ? liveApplicantsCount
+      : (job.applicationsCount ?? job._count?.applications ?? 0);
 
   const getStatusColor = () => {
     if (job.moderationStatus === 'PENDING_PAYMENT' || job.paymentStatus === 'PENDING') {

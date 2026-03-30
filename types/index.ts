@@ -51,6 +51,8 @@ export interface Job {
   _count?: {
     applications?: number;
   };
+  /** Conteo de postulaciones (preferir sobre _count.applications si existe) */
+  applicationsCount?: number;
   // Payment fields
   isPaid?: boolean;
   paymentOrderId?: string;

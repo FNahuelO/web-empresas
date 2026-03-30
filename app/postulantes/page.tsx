@@ -47,13 +47,14 @@ function PostulantesContent() {
         setLoading(true);
         const jobs = await jobService.getCompanyJobs();
         if (cancelled) return;
-        const activeJobs = Array.isArray(jobs)
-          ? jobs.filter((j) => j.status === 'active' || j.status === 'activo')
-          : [];
+        // Todas las publicaciones de la empresa (activas, pausadas, inactivas por plan vencido, etc.).
+        // Antes solo se incluían active|activo: al expirar el plan el cron pasa el job a "inactive" y los
+        // postulantes desaparecían de esta pantalla aunque siguieran en la base.
+        const companyJobs = Array.isArray(jobs) ? jobs : [];
 
         // Cargar todos los postulantes en PARALELO en vez de secuencial
         const results = await Promise.allSettled(
-          activeJobs.map(async (job) => {
+          companyJobs.map(async (job) => {
             const applicants = await jobService.getJobApplicants(job.id);
             const applicantsArray = Array.isArray(applicants) ? applicants : [];
             return applicantsArray.map((app) => ({ ...app, job }));

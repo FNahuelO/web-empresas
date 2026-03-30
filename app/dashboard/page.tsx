@@ -60,19 +60,19 @@ export default function DashboardPage() {
       let totalApplicants = 0;
       let interviews = 0;
 
-      for (const job of activeJobs.slice(0, 5)) {
-        try {
-          const applicants = await jobService.getJobApplicants(job.id);
-          const applicantsArray = Array.isArray(applicants) ? applicants : [];
-          allApplications.push(...applicantsArray);
-          totalApplicants += applicantsArray.length;
-          interviews += applicantsArray.filter(
-            (app) => app.status === 'INTERVIEW' || app.estado === 'entrevista'
-          ).length;
-        } catch (error) {
-          console.error(`Error loading applicants for job ${job.id}:`, error);
-        }
-      }
+      // Postulaciones de todos los avisos (incluye expirados/inactivos por plan) para no “perder” candidatos en la vista.
+      const applicantBatches = await Promise.allSettled(
+        jobsArray.map((job) => jobService.getJobApplicants(job.id))
+      );
+      applicantBatches.forEach((result) => {
+        if (result.status !== 'fulfilled') return;
+        const applicantsArray = Array.isArray(result.value) ? result.value : [];
+        allApplications.push(...applicantsArray);
+        totalApplicants += applicantsArray.length;
+        interviews += applicantsArray.filter(
+          (app) => app.status === 'INTERVIEW' || app.estado === 'entrevista'
+        ).length;
+      });
 
       const sortedApplications = allApplications.sort((a, b) => {
         const dateA = new Date(a.appliedAt || a.fechaAplicacion || 0).getTime();
