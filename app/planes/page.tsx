@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { subscriptionService } from '@/services/subscriptionService';
 import { promotionService } from '@/services/promotionService';
 import { jobService } from '@/services/jobService';
+import { paymentService } from '@/services/paymentService';
 import { Plan, Subscription, LaunchTrialStatus, Job } from '@/types';
 import {
   CheckIcon,
@@ -25,6 +26,7 @@ const getPlanPriceArs = (plan: any): number =>
 
 export default function PlanesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [promoStatus, setPromoStatus] = useState<LaunchTrialStatus | null>(null);
@@ -33,6 +35,8 @@ export default function PlanesPage() {
   const [claimingPromo, setClaimingPromo] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [showJobSelector, setShowJobSelector] = useState(false);
+  const [renewingPlanId, setRenewingPlanId] = useState<string | null>(null);
+  const renewJobIdParam = searchParams.get('renewJobId');
 
   useEffect(() => {
     loadData();
@@ -125,6 +129,29 @@ export default function PlanesPage() {
     !promoStatus.alreadyUsed;
 
   const promoUsed = promoStatus?.promotion && promoStatus.alreadyUsed;
+  const renewTargetJob = renewJobIdParam
+    ? jobs.find((job) => job.id === renewJobIdParam)
+    : null;
+
+  const handleRenewPlan = async (planId: string) => {
+    if (!renewJobIdParam) {
+      toast.error('No se encontró la publicación a renovar');
+      return;
+    }
+
+    try {
+      setRenewingPlanId(planId);
+      await paymentService.createJobPaymentOrder(renewJobIdParam, planId);
+      toast.success('Plan seleccionado. Ahora completá el pago de la renovación.');
+      router.push('/publicaciones');
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message || error?.message || 'No se pudo iniciar la renovación';
+      toast.error(message);
+    } finally {
+      setRenewingPlanId(null);
+    }
+  };
 
   return (
     <Layout>
@@ -137,6 +164,19 @@ export default function PlanesPage() {
         </div>
 
         {/* Info */}
+        {renewJobIdParam && (
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
+            <p className="text-sm font-semibold text-amber-900">
+              Renovación de publicación
+            </p>
+            <p className="text-sm text-amber-800 mt-1">
+              {renewTargetJob
+                ? `Seleccioná un plan para renovar "${renewTargetJob.title || 'Sin título'}".`
+                : 'Seleccioná un plan para continuar con la renovación.'}
+            </p>
+          </div>
+        )}
+
         <div className="rounded-lg bg-blue-50 border border-blue-200 p-6">
           <h3 className="text-sm font-semibold text-blue-900 mb-2">
             ¿Cómo funcionan los planes?
@@ -388,6 +428,17 @@ export default function PlanesPage() {
                       </li>
                     ))}
                   </ul>
+
+                  {renewJobIdParam && (
+                    <button
+                      type="button"
+                      onClick={() => handleRenewPlan(plan.id)}
+                      disabled={renewingPlanId === plan.id}
+                      className="mt-6 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {renewingPlanId === plan.id ? 'Iniciando renovación...' : 'Seleccionar para renovar'}
+                    </button>
+                  )}
                 </div>
               );
             })

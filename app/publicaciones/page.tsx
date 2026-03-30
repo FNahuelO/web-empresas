@@ -865,7 +865,7 @@ export default function PublicacionesPage() {
                             {jobExpired && !jobNeedsPayment && (
                               <>
                                 <Link
-                                  href="/planes"
+                                  href={`/planes?renewJobId=${job.id}`}
                                   className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
                                 >
                                   <ArrowPathIcon className="h-4 w-4" />
