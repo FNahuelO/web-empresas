@@ -26,6 +26,7 @@ export default function ForgotPasswordPage() {
     try {
       await httpClient.post(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, {
         email: email.trim().toLowerCase(),
+        source: 'web-empresas',
       });
       setEmailSent(true);
     } catch (error: any) {
