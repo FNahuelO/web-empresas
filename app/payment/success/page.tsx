@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { paymentService } from '@/services/paymentService';
+import { jobService } from '@/services/jobService';
 import { useReturnToAppAfterPayment } from '@/hooks/useReturnToAppAfterPayment';
-import { buildAppPaymentDeepLink } from '@/lib/appPaymentBridge';
+import { buildAppPaymentDeepLink, isPaymentFromApp, redirectToAppPayment } from '@/lib/appPaymentBridge';
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
@@ -14,6 +15,7 @@ function PaymentSuccessContent() {
   const jobId = searchParams?.get('jobId') || '';
   const [status, setStatus] = useState<'loading' | 'success' | 'pending' | 'error'>('loading');
   const [message, setMessage] = useState('Verificando tu pago...');
+  const [jobTitle, setJobTitle] = useState<string | null>(null);
 
   const { shouldReturnToApp } = useReturnToAppAfterPayment('success', {
     enabled: status === 'success' || status === 'pending',
@@ -21,6 +23,22 @@ function PaymentSuccessContent() {
     orderId,
     delayMs: status === 'success' ? 1200 : 2000,
   });
+
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    jobService
+      .getJobDetail(jobId)
+      .then((job) => {
+        if (!cancelled && job?.title) {
+          setJobTitle(job.title);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId]);
 
   useEffect(() => {
     if (!orderId) {
@@ -50,7 +68,17 @@ function PaymentSuccessContent() {
       } catch (error: any) {
         if (cancelled) return;
         const errorText = error?.message || 'No pudimos confirmar el pago todavía.';
-        if (errorText.toLowerCase().includes('pendiente')) {
+        const lower = errorText.toLowerCase();
+        if (lower.includes('rechaz') || lower.includes('cancel')) {
+          if (isPaymentFromApp(searchParams)) {
+            redirectToAppPayment('failure', { jobId, orderId });
+            return;
+          }
+          setStatus('error');
+          setMessage('El pago fue rechazado o cancelado.');
+          return;
+        }
+        if (lower.includes('pendiente')) {
           setStatus('pending');
           setMessage(errorText);
         } else {
@@ -107,8 +135,8 @@ function PaymentSuccessContent() {
               <p className="mt-2 text-sm font-medium text-[#002D5A]">Volviendo a la app...</p>
             )}
 
-            {jobId && (
-              <p className="mt-2 text-xs text-gray-400">Publicación: {jobId}</p>
+            {jobTitle && (
+              <p className="mt-2 text-sm text-gray-500">Publicación: {jobTitle}</p>
             )}
 
             <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
@@ -119,7 +147,7 @@ function PaymentSuccessContent() {
                 >
                   Volver a la app
                 </a>
-              ) : (
+              ) : isSuccess || isPending ? (
                 <>
                   <Link
                     href="/publicaciones"
@@ -134,6 +162,13 @@ function PaymentSuccessContent() {
                     Ir al dashboard
                   </Link>
                 </>
+              ) : (
+                <Link
+                  href="/publicaciones"
+                  className="rounded-lg bg-[#002D5A] px-5 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-[#02345fb6]"
+                >
+                  Volver a publicaciones
+                </Link>
               )}
             </div>
           </div>

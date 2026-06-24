@@ -23,6 +23,7 @@ export interface MercadoPagoPreference {
   preferenceId: string;
   initPoint: string;
   sandboxInitPoint?: string;
+  testMode?: boolean;
   amount: number;
   currency: string;
 }
@@ -46,6 +47,7 @@ export interface PaymentConfig {
   defaultProvider: string;
   enableIapFallback: boolean;
   mercadoPagoConfigured: boolean;
+  mercadoPagoTestMode?: boolean;
   webEmpresasUrl?: string | null;
   iosMobileProvider?: 'iap' | 'mercadopago_web';
   androidMobileProvider?: 'iap' | 'mercadopago' | 'mercadopago_web';

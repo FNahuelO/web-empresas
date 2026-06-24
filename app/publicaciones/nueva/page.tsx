@@ -449,7 +449,8 @@ export default function NuevaPublicacionPage() {
         platform: 'web',
       });
 
-      window.location.href = preference.initPoint;
+      
+      window.location.href = preference.sandboxInitPoint || preference.initPoint;
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||

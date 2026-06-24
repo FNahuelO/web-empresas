@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 const STORAGE_KEY = "ty-empresas-mobile-desktop-disclaimer-dismissed";
+
+/** Sin aviso en flujos de publicación y pago (p. ej. checkout desde la app móvil). */
+const HIDDEN_PATH_PREFIXES = ["/publicaciones", "/payment"];
+
+function isDisclaimerHiddenForPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return HIDDEN_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
 
 const PLAY_URL =
   "https://play.google.com/store/apps/details?id=com.trabajoya.app";
@@ -11,6 +22,7 @@ const APP_STORE_URL =
   "https://apps.apple.com/us/app/trabajo-ya/id6757190754";
 
 export default function MobileDesktopDisclaimer() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -19,6 +31,10 @@ export default function MobileDesktopDisclaimer() {
     const mq = window.matchMedia("(max-width: 1023px)");
 
     const sync = () => {
+      if (isDisclaimerHiddenForPath(pathname)) {
+        setVisible(false);
+        return;
+      }
       if (sessionStorage.getItem(STORAGE_KEY) === "1") {
         setVisible(false);
         return;
@@ -29,7 +45,7 @@ export default function MobileDesktopDisclaimer() {
     sync();
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (!visible) return;

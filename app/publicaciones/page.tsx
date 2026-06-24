@@ -369,6 +369,12 @@ function PublicacionesPageContent() {
         platform: 'web',
         fromApp: paymentFromApp,
       });
+      if (preference.testMode) {
+        toast(
+          'Modo prueba MP: NO uses "Dinero en cuenta". Elegí "Tarjeta" y cargá: 5031 7557 3453 0604, titular APRO, DNI 12345678. Sesión: comprador de prueba del panel MP.',
+          { duration: 14000 }
+        );
+      }
       window.location.href = preference.initPoint;
     } catch (error: any) {
       const errorMessage =

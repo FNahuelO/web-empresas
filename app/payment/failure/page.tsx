@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { XCircleIcon } from '@heroicons/react/24/outline';
+import { jobService } from '@/services/jobService';
 import { useReturnToAppAfterPayment } from '@/hooks/useReturnToAppAfterPayment';
 import { buildAppPaymentDeepLink } from '@/lib/appPaymentBridge';
 
@@ -11,12 +12,29 @@ function PaymentFailureContent() {
   const searchParams = useSearchParams();
   const jobId = searchParams?.get('jobId') || '';
   const orderId = searchParams?.get('orderId') || '';
+  const [jobTitle, setJobTitle] = useState<string | null>(null);
   const { shouldReturnToApp } = useReturnToAppAfterPayment('failure', {
     enabled: true,
     jobId,
     orderId,
     delayMs: 2000,
   });
+
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    jobService
+      .getJobDetail(jobId)
+      .then((job) => {
+        if (!cancelled && job?.title) {
+          setJobTitle(job.title);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId]);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10 sm:px-6">
@@ -31,6 +49,9 @@ function PaymentFailureContent() {
           </p>
           {shouldReturnToApp && (
             <p className="mt-2 text-sm font-medium text-[#002D5A]">Volviendo a la app...</p>
+          )}
+          {jobTitle && (
+            <p className="mt-2 text-sm text-gray-500">Publicación: {jobTitle}</p>
           )}
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
             {shouldReturnToApp ? (

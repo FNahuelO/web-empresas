@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { ClockIcon } from '@heroicons/react/24/outline';
+import { jobService } from '@/services/jobService';
 import { useReturnToAppAfterPayment } from '@/hooks/useReturnToAppAfterPayment';
 import { buildAppPaymentDeepLink } from '@/lib/appPaymentBridge';
 
@@ -11,12 +12,29 @@ function PaymentPendingContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams?.get('orderId') || '';
   const jobId = searchParams?.get('jobId') || '';
+  const [jobTitle, setJobTitle] = useState<string | null>(null);
   const { shouldReturnToApp } = useReturnToAppAfterPayment('pending', {
     enabled: true,
     jobId,
     orderId,
     delayMs: 2000,
   });
+
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    jobService
+      .getJobDetail(jobId)
+      .then((job) => {
+        if (!cancelled && job?.title) {
+          setJobTitle(job.title);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId]);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10 sm:px-6">
@@ -29,8 +47,8 @@ function PaymentPendingContent() {
           <p className="mt-3 text-sm text-gray-600">
             Tu pago está en proceso. Te notificaremos cuando se confirme y tu publicación quede activa.
           </p>
-          {orderId && (
-            <p className="mt-2 text-xs text-gray-400">Orden: {orderId}</p>
+          {jobTitle && (
+            <p className="mt-2 text-sm text-gray-500">Publicación: {jobTitle}</p>
           )}
           {shouldReturnToApp && (
             <p className="mt-2 text-sm font-medium text-[#002D5A]">Volviendo a la app...</p>
