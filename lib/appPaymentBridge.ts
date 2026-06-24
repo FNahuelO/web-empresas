@@ -3,6 +3,55 @@ const APP_SCHEME = process.env.NEXT_PUBLIC_APP_DEEP_LINK_SCHEME || 'trabajoya';
 
 const ALLOWED_RETURN_PREFIXES = ['/publicaciones', '/payment', '/planes', '/dashboard'];
 
+/** Rutas de pago/checkout iniciadas desde la app móvil (sin mostrar aviso de escritorio). */
+export function isAppPaymentReturnPath(returnPath: string | null | undefined): boolean {
+  if (!returnPath) return false;
+  const trimmed = returnPath.trim();
+  if (!trimmed.startsWith('/')) return false;
+
+  const [pathOnly, query = ''] = trimmed.split('?');
+  const params = new URLSearchParams(query);
+
+  if (pathOnly === '/publicaciones' || pathOnly.startsWith('/publicaciones/')) {
+    return params.get('fromApp') === '1' || !!params.get('payJobId');
+  }
+  if (pathOnly === '/payment' || pathOnly.startsWith('/payment/')) {
+    return true;
+  }
+  if (pathOnly === '/auth/app-handoff') {
+    return true;
+  }
+
+  return false;
+}
+
+export function shouldHideMobileDesktopDisclaimer(
+  pathname: string | null,
+  searchParams: URLSearchParams | null
+): boolean {
+  if (!pathname) return false;
+
+  const hiddenPrefixes = ['/publicaciones', '/payment', '/auth/app-handoff', '/login'];
+  if (
+    hiddenPrefixes.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    )
+  ) {
+    if (pathname === '/login' || pathname.startsWith('/login/')) {
+      const returnTo = searchParams?.get('returnTo');
+      return isPaymentFromApp(searchParams) || isAppPaymentReturnPath(returnTo);
+    }
+    return true;
+  }
+
+  if (isPaymentFromApp(searchParams)) return true;
+
+  const returnTo = searchParams?.get('returnTo');
+  if (isAppPaymentReturnPath(returnTo)) return true;
+
+  return false;
+}
+
 export function sanitizeReturnPath(returnPath: string | null | undefined): string | null {
   if (!returnPath) return null;
   const trimmed = returnPath.trim();

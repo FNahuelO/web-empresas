@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import MobileDesktopDisclaimer from "@/components/MobileDesktopDisclaimer";
@@ -101,7 +102,9 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         {children}
-        <MobileDesktopDisclaimer />
+        <Suspense fallback={null}>
+          <MobileDesktopDisclaimer />
+        </Suspense>
         <Toaster position="top-right" />
       </body>
     </html>

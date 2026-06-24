@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { API_BASE_URL } from '@/lib/api';
-import { buildLoginUrlWithReturn, sanitizeReturnPath } from '@/lib/appPaymentBridge';
+import { buildLoginUrlWithReturn, markPaymentFromApp, sanitizeReturnPath, isAppPaymentReturnPath } from '@/lib/appPaymentBridge';
 import Link from 'next/link';
 
 function AppHandoffContent() {
@@ -14,6 +14,10 @@ function AppHandoffContent() {
   useEffect(() => {
     const code = searchParams?.get('code')?.trim();
     const returnToFallback = sanitizeReturnPath(searchParams?.get('returnTo'));
+
+    if (returnToFallback && isAppPaymentReturnPath(returnToFallback)) {
+      markPaymentFromApp();
+    }
 
     if (!code) {
       setError('Enlace inválido. Volvé a la app e intentá de nuevo.');
