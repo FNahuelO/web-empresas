@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { httpClient } from '@/lib/httpClient';
 import { API_ENDPOINTS } from '@/lib/api';
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import Image from 'next/image';
 import Link from 'next/link';
 import { EnvelopeIcon, EyeIcon, EyeSlashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { sanitizeReturnPath } from '@/lib/appPaymentBridge';
 
 function parseFriendlyError(message: unknown): string {
   const fallback = 'Error al iniciar sesión';
@@ -47,6 +48,20 @@ function isEmailNotVerifiedError(message: string): boolean {
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-white">
+          <p className="text-sm text-gray-500">Cargando...</p>
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -54,6 +69,12 @@ export default function LoginPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const { login, isAuthenticated, loadUser } = useAuthStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = sanitizeReturnPath(searchParams?.get('returnTo'));
+
+  const redirectAfterAuth = () => {
+    router.replace(returnTo || '/dashboard');
+  };
 
   // Estado del modal de email no verificado
   const [showVerifyModal, setShowVerifyModal] = useState(false);
@@ -64,7 +85,7 @@ export default function LoginPage() {
 
     const checkPersistedSession = async () => {
       if (isAuthenticated) {
-        router.replace('/dashboard');
+        redirectAfterAuth();
         if (!cancelled) setCheckingSession(false);
         return;
       }
@@ -88,7 +109,7 @@ export default function LoginPage() {
       try {
         await loadUser();
         if (!cancelled && useAuthStore.getState().isAuthenticated) {
-          router.replace('/dashboard');
+          redirectAfterAuth();
         }
       } finally {
         if (!cancelled) setCheckingSession(false);
@@ -100,7 +121,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, loadUser, router]);
+  }, [isAuthenticated, loadUser, router, returnTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +130,7 @@ export default function LoginPage() {
     try {
       await login(email, password);
       toast.success('Inicio de sesión exitoso');
-      router.push('/dashboard');
+      redirectAfterAuth();
     } catch (error: any) {
       const status = error?.response?.status;
       const apiMessage = error?.response?.data?.message || error?.message || '';

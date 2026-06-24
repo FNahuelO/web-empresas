@@ -124,6 +124,7 @@ export default function NuevaPublicacionPage() {
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isProcessingCoinPayment, setIsProcessingCoinPayment] = useState(false);
+  const [isProcessingMercadoPago, setIsProcessingMercadoPago] = useState(false);
   const [needsPayment, setNeedsPayment] = useState(false);
   const [promoStatus, setPromoStatus] = useState<LaunchTrialStatus | null>(null);
   const [promoSelected, setPromoSelected] = useState(false);
@@ -427,6 +428,40 @@ export default function NuevaPublicacionPage() {
     toast.error('Error en PayPal. Intenta nuevamente.');
   };
 
+  const handleMercadoPagoPayment = async () => {
+    if (!createdJob?.id || !selectedPlan?.id) {
+      toast.error('Seleccioná un plan para continuar');
+      return;
+    }
+
+    try {
+      setIsProcessingMercadoPago(true);
+      setPaymentError(null);
+
+      persistPendingJobPlan(createdJob.id, {
+        id: selectedPlan.id,
+        name: selectedPlan.name || null,
+      });
+
+      const preference = await paymentService.createMercadoPagoPreference({
+        jobId: createdJob.id,
+        planId: selectedPlan.id,
+        platform: 'web',
+      });
+
+      window.location.href = preference.initPoint;
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'No se pudo iniciar el pago con Mercado Pago.';
+      setPaymentError(message);
+      toast.error(message);
+    } finally {
+      setIsProcessingMercadoPago(false);
+    }
+  };
+
   const handleCoinPayment = async () => {
     if (!createdJob?.id) return;
 
@@ -517,6 +552,8 @@ export default function NuevaPublicacionPage() {
   };
 
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  const enableLegacyPayments =
+    process.env.NEXT_PUBLIC_ENABLE_LEGACY_PAYMENTS === 'true';
 
   // Stepper indicator
   const steps = [
@@ -1187,9 +1224,8 @@ export default function NuevaPublicacionPage() {
               </div>
             ) : (
               <div className="rounded-lg bg-white p-6 shadow">
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">Elegí tu método de pago</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Pagar con Mercado Pago</h2>
 
-                {/* Price Summary */}
                 <div className="mb-6 rounded-lg bg-gray-50 p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1203,12 +1239,12 @@ export default function NuevaPublicacionPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xl font-bold text-gray-900">
-                        PayPal: ${selectedPlan ? getPlanPriceUsd(selectedPlan).toFixed(2) : createdJob.paymentAmount?.toFixed(2) || '10.00'} USD
+                      <p className="text-2xl font-bold text-gray-900">
+                        ${selectedPlan
+                          ? getPlanPriceArs(selectedPlan).toLocaleString('es-AR')
+                          : createdJob.paymentAmount?.toLocaleString('es-AR') || '0'}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        COIN: ${selectedPlan ? getPlanPriceArs(selectedPlan).toLocaleString('es-AR') : '0'} ARS
-                      </p>
+                      <p className="text-xs text-gray-500">ARS</p>
                     </div>
                   </div>
                 </div>
@@ -1222,72 +1258,82 @@ export default function NuevaPublicacionPage() {
                   </div>
                 )}
 
-                <div className="mb-6">
-                  <button
-                    type="button"
-                    onClick={handleCoinPayment}
-                    disabled={isProcessingCoinPayment || isLoading || isCreatingOrder}
-                    className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-bold text-white shadow transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isProcessingCoinPayment ? 'Procesando COIN...' : 'Pagar con COIN'}
-                  </button>
-                  <p className="mt-2 text-xs text-gray-500">
-                    Serás redirigido a la pasarela de COIN para completar el pago.
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleMercadoPagoPayment}
+                  disabled={
+                    isProcessingMercadoPago ||
+                    isLoading ||
+                    isCreatingOrder ||
+                    !selectedPlan?.id
+                  }
+                  className="w-full rounded-lg bg-[#009EE3] py-3 text-sm font-bold text-white shadow transition-all hover:bg-[#0086c3] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isProcessingMercadoPago
+                    ? 'Redirigiendo a Mercado Pago...'
+                    : 'Pagar con Mercado Pago'}
+                </button>
+                <p className="mt-2 text-xs text-gray-500">
+                  Serás redirigido a Mercado Pago para completar el pago de forma segura.
+                </p>
 
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="h-px flex-1 bg-gray-200" />
-                  <span className="text-xs font-medium uppercase tracking-wide text-gray-400">o</span>
-                  <div className="h-px flex-1 bg-gray-200" />
-                </div>
-
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Pagar con PayPal</h3>
-                {paypalClientId && paypalClientId !== 'YOUR_PAYPAL_CLIENT_ID_HERE' ? (
-                  <PayPalScriptProvider
-                    options={{
-                      clientId: paypalClientId,
-                      currency: 'USD',
-                      intent: 'capture',
-                    }}
-                  >
-                    <PayPalButtons
-                      style={{
-                        layout: 'vertical',
-                        color: 'blue',
-                        shape: 'rect',
-                        label: 'pay',
-                        height: 48,
-                      }}
-                      disabled={isLoading || isCreatingOrder}
-                      createOrder={async () => {
-                        return await handleCreatePaypalOrder();
-                      }}
-                      onApprove={async (data) => {
-                        await handlePaypalApprove(data);
-                      }}
-                      onError={handlePaypalError}
-                      onCancel={() => {
-                        toast('Pago cancelado', { icon: '⚠️' });
-                      }}
-                    />
-                  </PayPalScriptProvider>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
-                      <div className="flex items-start">
-                        <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-yellow-800">
-                            PayPal no configurado
-                          </p>
-                          <p className="text-xs text-yellow-700 mt-1">
-                            Configura <code className="bg-yellow-100 px-1 rounded">NEXT_PUBLIC_PAYPAL_CLIENT_ID</code> en el archivo <code className="bg-yellow-100 px-1 rounded">.env.local</code> para habilitar los pagos con PayPal.
-                          </p>
-                        </div>
-                      </div>
+                {enableLegacyPayments && (
+                  <>
+                    <div className="my-6 flex items-center gap-3">
+                      <div className="h-px flex-1 bg-gray-200" />
+                      <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                        métodos alternativos
+                      </span>
+                      <div className="h-px flex-1 bg-gray-200" />
                     </div>
-                  </div>
+
+                    <div className="mb-6">
+                      <button
+                        type="button"
+                        onClick={handleCoinPayment}
+                        disabled={isProcessingCoinPayment || isLoading || isCreatingOrder}
+                        className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-bold text-white shadow transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isProcessingCoinPayment ? 'Procesando COIN...' : 'Pagar con COIN'}
+                      </button>
+                    </div>
+
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Pagar con PayPal</h3>
+                    {paypalClientId && paypalClientId !== 'YOUR_PAYPAL_CLIENT_ID_HERE' ? (
+                      <PayPalScriptProvider
+                        options={{
+                          clientId: paypalClientId,
+                          currency: 'USD',
+                          intent: 'capture',
+                        }}
+                      >
+                        <PayPalButtons
+                          style={{
+                            layout: 'vertical',
+                            color: 'blue',
+                            shape: 'rect',
+                            label: 'pay',
+                            height: 48,
+                          }}
+                          disabled={isLoading || isCreatingOrder}
+                          createOrder={async () => {
+                            return await handleCreatePaypalOrder();
+                          }}
+                          onApprove={async (data) => {
+                            await handlePaypalApprove(data);
+                          }}
+                          onError={handlePaypalError}
+                          onCancel={() => {
+                            toast('Pago cancelado', { icon: '⚠️' });
+                          }}
+                        />
+                      </PayPalScriptProvider>
+                    ) : (
+                      <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
+                        <p className="text-sm text-yellow-800">PayPal no configurado</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

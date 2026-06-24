@@ -203,7 +203,8 @@ class HttpClient {
           originalRequest.url?.includes('/api/auth/verify-email') ||
           originalRequest.url?.includes('/api/auth/resend-verification') ||
           originalRequest.url?.includes('/api/auth/forgot-password') ||
-          originalRequest.url?.includes('/api/auth/reset-password');
+          originalRequest.url?.includes('/api/auth/reset-password') ||
+          originalRequest.url?.includes('/api/auth/web-handoff/exchange');
 
         if (
           error.response?.status === 401 &&
@@ -251,7 +252,12 @@ class HttpClient {
             }
 
             if (typeof window !== 'undefined') {
-              window.location.href = '/login';
+              const returnPath = `${window.location.pathname}${window.location.search}`;
+              const loginUrl =
+                returnPath && returnPath !== '/login'
+                  ? `/login?returnTo=${encodeURIComponent(returnPath)}`
+                  : '/login';
+              window.location.href = loginUrl;
             }
 
             return Promise.reject(refreshError);

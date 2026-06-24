@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import Sidebar from './Sidebar';
 import { Bars3Icon } from '@heroicons/react/24/outline';
+import { buildLoginUrlWithReturn } from '@/lib/appPaymentBridge';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, loadUser } = useAuthStore();
@@ -20,7 +21,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         await loadUser();
       }
     } else if (!isLoading) {
-      router.push('/login');
+      const returnPath =
+        typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search}`
+          : '/dashboard';
+      router.push(buildLoginUrlWithReturn(returnPath));
     }
   }, [isAuthenticated, isLoading, loadUser, router]);
 
@@ -34,7 +39,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         const token = localStorage.getItem('accessToken');
         const refreshToken = localStorage.getItem('refreshToken');
         if (!token && !refreshToken && isAuthenticated) {
-          router.push('/login');
+          const returnPath = `${window.location.pathname}${window.location.search}`;
+          router.push(buildLoginUrlWithReturn(returnPath));
         }
       }
     };

@@ -55,6 +55,11 @@ export const API_ENDPOINTS = {
     CREATE_ORDER: '/api/payments/create-order',
     CAPTURE_ORDER: (orderId: string) => `/api/payments/capture-order/${orderId}`,
     HISTORY: '/api/payments/history',
+    CONFIG: '/api/payments/config',
+    MERCADOPAGO: {
+      CREATE_PREFERENCE: '/api/payments/mercadopago/create-preference',
+      STATUS: (orderId: string) => `/api/payments/mercadopago/status/${orderId}`,
+    },
   },
 
   // Video Meetings

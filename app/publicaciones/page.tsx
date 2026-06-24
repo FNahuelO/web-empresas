@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { jobService } from '@/services/jobService';
 import { paymentService } from '@/services/paymentService';
@@ -27,6 +28,7 @@ import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 import JobDetailModal from '@/components/JobDetailModal';
+import { isPaymentFromApp, markPaymentFromApp } from '@/lib/appPaymentBridge';
 
 // ── Tipos del modal de confirmación ──
 type ConfirmModalData = {
@@ -38,9 +40,20 @@ type ConfirmModalData = {
 } | null;
 
 export default function PublicacionesPage() {
+  return (
+    <Suspense fallback={<Layout><div className="p-8 text-gray-600">Cargando...</div></Layout>}>
+      <PublicacionesPageContent />
+    </Suspense>
+  );
+}
+
+function PublicacionesPageContent() {
+  const searchParams = useSearchParams();
+  const autoPayStartedRef = useRef(false);
   const PENDING_JOB_PLAN_STORAGE_KEY = 'pendingJobPlansByJobId';
   const [storedPlansByJobId, setStoredPlansByJobId] = useState<Record<string, any>>({});
   const [planUsdPriceById, setPlanUsdPriceById] = useState<Record<string, number>>({});
+  const [planArsPriceById, setPlanArsPriceById] = useState<Record<string, number>>({});
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -48,6 +61,7 @@ export default function PublicacionesPage() {
   const [payingJobId, setPayingJobId] = useState<string | null>(null);
   const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<'paypal' | 'pagofacil' | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isProcessingMercadoPagoJobId, setIsProcessingMercadoPagoJobId] = useState<string | null>(null);
   const [isProcessingPagoFacilJobId, setIsProcessingPagoFacilJobId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -56,12 +70,54 @@ export default function PublicacionesPage() {
   const [confirmModal, setConfirmModal] = useState<ConfirmModalData>(null);
 
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  const enableLegacyPayments =
+    process.env.NEXT_PUBLIC_ENABLE_LEGACY_PAYMENTS === 'true';
 
   useEffect(() => {
     loadJobs();
     loadPlanPrices();
     loadStoredPendingPlans();
   }, []);
+
+  // Deep link desde app móvil: ?payJobId=&planId=&fromApp=1
+  useEffect(() => {
+    const payJobId = searchParams?.get('payJobId');
+    const planId = searchParams?.get('planId');
+    const fromApp = searchParams?.get('fromApp') === '1' || isPaymentFromApp(searchParams);
+
+    if (fromApp && typeof window !== 'undefined') {
+      markPaymentFromApp();
+    }
+
+    if (!payJobId || !planId || loading || autoPayStartedRef.current) {
+      return;
+    }
+
+    const job = jobs.find((item) => item.id === payJobId);
+    if (!job) {
+      return;
+    }
+
+    autoPayStartedRef.current = true;
+
+    if (typeof window !== 'undefined') {
+      const storedPlansRaw = localStorage.getItem(PENDING_JOB_PLAN_STORAGE_KEY);
+      const storedPlans = storedPlansRaw ? JSON.parse(storedPlansRaw) : {};
+      localStorage.setItem(
+        PENDING_JOB_PLAN_STORAGE_KEY,
+        JSON.stringify({
+          ...storedPlans,
+          [payJobId]: { planId, planName: null },
+        })
+      );
+      window.history.replaceState({}, '', '/publicaciones');
+    }
+
+    handleMercadoPagoCheckout(job, planId, fromApp).catch((error) => {
+      console.error('Auto pago Mercado Pago desde app:', error);
+      toast.error('No se pudo iniciar el pago con Mercado Pago');
+    });
+  }, [searchParams, jobs, loading]);
 
   const loadStoredPendingPlans = () => {
     if (typeof window === 'undefined') return;
@@ -74,14 +130,20 @@ export default function PublicacionesPage() {
     try {
       const plans = await subscriptionService.getPlans();
       const byId: Record<string, number> = {};
+      const byIdArs: Record<string, number> = {};
       for (const plan of plans || []) {
         const planAny = plan as any;
         const amount = Number(planAny?.priceUsd ?? planAny?.price);
+        const amountArs = Number(planAny?.priceArs ?? 0);
         if (plan?.id && Number.isFinite(amount) && amount > 0) {
           byId[plan.id] = amount;
         }
+        if (plan?.id && Number.isFinite(amountArs) && amountArs > 0) {
+          byIdArs[plan.id] = amountArs;
+        }
       }
       setPlanUsdPriceById(byId);
+      setPlanArsPriceById(byIdArs);
     } catch (error) {
       console.warn('No se pudieron cargar precios de planes para preview de pago', error);
     }
@@ -269,6 +331,54 @@ export default function PublicacionesPage() {
 
     setPayingJobId(jobId);
     setSelectedPaymentGateway(gateway);
+  };
+
+  const inferPlanIdForJob = (job: Job): string | null => {
+    const jobAny = job as any;
+    const storedPlanForJob = storedPlansByJobId?.[job.id] || null;
+    return (
+      jobAny?.selectedPlanId ||
+      jobAny?.planId ||
+      jobAny?.plan?.id ||
+      storedPlanForJob?.planId ||
+      (typeof jobAny?.entitlements?.[0]?.rawPayload?.selectedPlanId === 'string'
+        ? String(jobAny.entitlements[0].rawPayload.selectedPlanId).trim()
+        : null) ||
+      null
+    );
+  };
+
+  const handleMercadoPagoCheckout = async (
+    job: Job,
+    overridePlanId?: string | null,
+    fromApp?: boolean
+  ) => {
+    const planId = overridePlanId || inferPlanIdForJob(job);
+    if (!planId) {
+      toast.error('No se pudo determinar el plan. Volvé a crear la publicación o seleccioná un plan.');
+      return;
+    }
+
+    try {
+      setIsProcessingMercadoPagoJobId(job.id);
+      const paymentFromApp =
+        fromApp === true || (typeof window !== 'undefined' && isPaymentFromApp(null));
+      const preference = await paymentService.createMercadoPagoPreference({
+        jobId: job.id,
+        planId,
+        platform: 'web',
+        fromApp: paymentFromApp,
+      });
+      window.location.href = preference.initPoint;
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'No se pudo iniciar el pago con Mercado Pago';
+      toast.error(errorMessage);
+    } finally {
+      setIsProcessingMercadoPagoJobId(null);
+    }
   };
 
   const handlePagoFacilCheckout = async (job: Job) => {
@@ -884,23 +994,37 @@ export default function PublicacionesPage() {
                             {jobNeedsPayment && (
                               <div className="flex flex-col gap-2">
                                 <button
-                                  onClick={() => handleSelectPaymentGateway(job.id, 'paypal')}
-                                  className="flex items-center gap-1 rounded-md bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
+                                  onClick={() => handleMercadoPagoCheckout(job)}
+                                  disabled={isProcessingMercadoPagoJobId === job.id}
+                                  className="flex items-center gap-1 rounded-md bg-[#009EE3] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0086c3] disabled:opacity-50"
                                 >
                                   <CreditCardIcon className="h-4 w-4" />
-                                  {isPayingThis && selectedPaymentGateway === 'paypal'
-                                    ? 'Cancelar PayPal'
-                                    : 'Pagar con PayPal'}
+                                  {isProcessingMercadoPagoJobId === job.id
+                                    ? 'Redirigiendo...'
+                                    : 'Pagar con Mercado Pago'}
                                 </button>
-                                <button
-                                  onClick={() => handleSelectPaymentGateway(job.id, 'pagofacil')}
-                                  className="flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
-                                >
-                                  <CreditCardIcon className="h-4 w-4" />
-                                  {isPayingThis && selectedPaymentGateway === 'pagofacil'
-                                    ? 'Cancelar COIN'
-                                    : 'Pagar con COIN'}
-                                </button>
+                                {enableLegacyPayments && (
+                                  <>
+                                    <button
+                                      onClick={() => handleSelectPaymentGateway(job.id, 'paypal')}
+                                      className="flex items-center gap-1 rounded-md bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
+                                    >
+                                      <CreditCardIcon className="h-4 w-4" />
+                                      {isPayingThis && selectedPaymentGateway === 'paypal'
+                                        ? 'Cancelar PayPal'
+                                        : 'Pagar con PayPal'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleSelectPaymentGateway(job.id, 'pagofacil')}
+                                      className="flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                                    >
+                                      <CreditCardIcon className="h-4 w-4" />
+                                      {isPayingThis && selectedPaymentGateway === 'pagofacil'
+                                        ? 'Cancelar COIN'
+                                        : 'Pagar con COIN'}
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             )}
 
@@ -964,7 +1088,7 @@ export default function PublicacionesPage() {
                           </div>
 
                           {/* Inline PayPal Payment */}
-                          {isPayingThis &&
+                          {enableLegacyPayments && isPayingThis &&
                             selectedPaymentGateway === 'paypal' &&
                             paypalClientId &&
                             paypalClientId !== 'YOUR_PAYPAL_CLIENT_ID_HERE' && (
@@ -1009,7 +1133,7 @@ export default function PublicacionesPage() {
                               </div>
                             )}
 
-                          {isPayingThis &&
+                          {enableLegacyPayments && isPayingThis &&
                             selectedPaymentGateway === 'paypal' &&
                             (!paypalClientId || paypalClientId === 'YOUR_PAYPAL_CLIENT_ID_HERE') && (
                               <div className="mt-3 w-full sm:w-72 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
@@ -1023,7 +1147,7 @@ export default function PublicacionesPage() {
                             )}
 
                           {/* Inline Pago Fácil Payment */}
-                          {isPayingThis && selectedPaymentGateway === 'pagofacil' && (
+                          {enableLegacyPayments && isPayingThis && selectedPaymentGateway === 'pagofacil' && (
                             <div className="mt-3 w-full sm:w-72 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                               <div className="flex items-start">
                                 <CreditCardIcon className="h-4 w-4 text-emerald-600 mr-1.5 flex-shrink-0 mt-0.5" />

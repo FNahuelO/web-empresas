@@ -43,6 +43,9 @@ Crea un archivo `.env.local` con:
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:4000
+IPN_SHARED_SECRET=tu_secreto_ipn_opcional
+IPN_CONFIRM_FORWARD_URL=http://localhost:4000/api/payments/ipn/confirm
+IPN_REJECT_FORWARD_URL=http://localhost:4000/api/payments/ipn/reject
 ```
 
 O copia el archivo de ejemplo:
@@ -50,6 +53,20 @@ O copia el archivo de ejemplo:
 ```bash
 cp .env.example .env.local
 ```
+
+## Endpoints IPN (Pagos)
+
+Para proveedores que solicitan dos IPN separados (rutas del front, sin `/api`):
+
+- Confirmación: `/ipn/confirmacion`
+- Rechazo: `/ipn/rechazo`
+
+Si defines `IPN_SHARED_SECRET`, el proveedor debe enviar el header `x-ipn-secret`.
+
+Los eventos pueden reenviarse al backend en:
+
+- `/api/payments/ipn/confirm`
+- `/api/payments/ipn/reject`
 
 ## Estructura del Proyecto
 
