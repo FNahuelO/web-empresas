@@ -18,6 +18,8 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
+const PENDING_JOB_PLAN_STORAGE_KEY = 'pendingJobPlansByJobId';
+
 const getPlanPriceUsd = (plan: any): number =>
   Number(plan?.priceUsd ?? plan?.price) || 0;
 
@@ -36,7 +38,9 @@ function PlanesPageContent() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [showJobSelector, setShowJobSelector] = useState(false);
   const [renewingPlanId, setRenewingPlanId] = useState<string | null>(null);
+  const [selectingPlanId, setSelectingPlanId] = useState<string | null>(null);
   const renewJobIdParam = searchParams.get('renewJobId');
+  const payJobIdParam = searchParams.get('payJobId');
 
   useEffect(() => {
     loadData();
@@ -132,6 +136,9 @@ function PlanesPageContent() {
   const renewTargetJob = renewJobIdParam
     ? jobs.find((job) => job.id === renewJobIdParam)
     : null;
+  const payTargetJob = payJobIdParam
+    ? jobs.find((job) => job.id === payJobIdParam)
+    : null;
 
   const handleRenewPlan = async (planId: string) => {
     if (!renewJobIdParam) {
@@ -150,6 +157,45 @@ function PlanesPageContent() {
       toast.error(message);
     } finally {
       setRenewingPlanId(null);
+    }
+  };
+
+  const handleSelectPlanForPayment = async (planId: string) => {
+    if (!payJobIdParam) {
+      toast.error('No se encontró la publicación');
+      return;
+    }
+
+    try {
+      setSelectingPlanId(planId);
+      const selectedPlan = plans.find((plan) => plan.id === planId);
+
+      if (typeof window !== 'undefined') {
+        const storedPlansRaw = localStorage.getItem(PENDING_JOB_PLAN_STORAGE_KEY);
+        const storedPlans = storedPlansRaw ? JSON.parse(storedPlansRaw) : {};
+        localStorage.setItem(
+          PENDING_JOB_PLAN_STORAGE_KEY,
+          JSON.stringify({
+            ...storedPlans,
+            [payJobIdParam]: {
+              planId,
+              planName: selectedPlan?.name || null,
+            },
+          })
+        );
+      }
+
+      router.push(
+        `/publicaciones?payJobId=${encodeURIComponent(payJobIdParam)}&planId=${encodeURIComponent(planId)}`
+      );
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'No se pudo seleccionar el plan';
+      toast.error(message);
+    } finally {
+      setSelectingPlanId(null);
     }
   };
 
@@ -173,6 +219,19 @@ function PlanesPageContent() {
               {renewTargetJob
                 ? `Seleccioná un plan para renovar "${renewTargetJob.title || 'Sin título'}".`
                 : 'Seleccioná un plan para continuar con la renovación.'}
+            </p>
+          </div>
+        )}
+
+        {payJobIdParam && (
+          <div className="rounded-lg bg-orange-50 border border-orange-200 p-4">
+            <p className="text-sm font-semibold text-orange-900">
+              Activar publicación
+            </p>
+            <p className="text-sm text-orange-800 mt-1">
+              {payTargetJob
+                ? `Seleccioná un plan para publicar "${payTargetJob.title || 'Sin título'}".`
+                : 'Seleccioná un plan para continuar con tu publicación.'}
             </p>
           </div>
         )}
@@ -429,14 +488,24 @@ function PlanesPageContent() {
                     ))}
                   </ul>
 
-                  {renewJobIdParam && (
+                  {(renewJobIdParam || payJobIdParam) && (
                     <button
                       type="button"
-                      onClick={() => handleRenewPlan(plan.id)}
-                      disabled={renewingPlanId === plan.id}
+                      onClick={() =>
+                        renewJobIdParam
+                          ? handleRenewPlan(plan.id)
+                          : handleSelectPlanForPayment(plan.id)
+                      }
+                      disabled={
+                        renewingPlanId === plan.id || selectingPlanId === plan.id
+                      }
                       className="mt-6 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      {renewingPlanId === plan.id ? 'Iniciando renovación...' : 'Seleccionar para renovar'}
+                      {renewingPlanId === plan.id || selectingPlanId === plan.id
+                        ? 'Procesando...'
+                        : renewJobIdParam
+                          ? 'Seleccionar para renovar'
+                          : 'Seleccionar plan'}
                     </button>
                   )}
                 </div>

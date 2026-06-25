@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { jobService } from '@/services/jobService';
 import { paymentService, resolveMercadoPagoCheckoutUrl } from '@/services/paymentService';
@@ -49,6 +49,7 @@ export default function PublicacionesPage() {
 
 function PublicacionesPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const autoPayStartedRef = useRef(false);
   const PENDING_JOB_PLAN_STORAGE_KEY = 'pendingJobPlansByJobId';
   const [storedPlansByJobId, setStoredPlansByJobId] = useState<Record<string, any>>({});
@@ -348,6 +349,51 @@ function PublicacionesPageContent() {
     );
   };
 
+  const promptPlanSelection = (job: Job) => {
+    toast.custom(
+      (t) => (
+        <div
+          className={`${
+            t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full rounded-lg bg-white p-4 shadow-lg ring-1 ring-black/5`}
+        >
+          <div className="flex items-start gap-3">
+            <ExclamationTriangleIcon className="h-5 w-5 flex-shrink-0 text-red-500" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">
+                No se pudo determinar el plan
+              </p>
+              <p className="mt-1 text-sm text-gray-600">
+                Elegí un plan para continuar con la publicación
+                {job.title ? ` "${job.title}"` : ''}.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.dismiss(t.id);
+                    router.push(`/planes?payJobId=${encodeURIComponent(job.id)}`);
+                  }}
+                  className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-700"
+                >
+                  Elegir plan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toast.dismiss(t.id)}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+      { duration: 10000 }
+    );
+  };
+
   const handleMercadoPagoCheckout = async (
     job: Job,
     overridePlanId?: string | null,
@@ -355,7 +401,7 @@ function PublicacionesPageContent() {
   ) => {
     const planId = overridePlanId || inferPlanIdForJob(job);
     if (!planId) {
-      toast.error('No se pudo determinar el plan. Volvé a crear la publicación o seleccioná un plan.');
+      promptPlanSelection(job);
       return;
     }
 
@@ -999,16 +1045,25 @@ function PublicacionesPageContent() {
                             {/* Pagar */}
                             {jobNeedsPayment && (
                               <div className="flex flex-col gap-2">
-                                <button
-                                  onClick={() => handleMercadoPagoCheckout(job)}
-                                  disabled={isProcessingMercadoPagoJobId === job.id}
-                                  className="flex items-center gap-1 rounded-md bg-[#009EE3] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0086c3] disabled:opacity-50"
-                                >
-                                  <CreditCardIcon className="h-4 w-4" />
-                                  {isProcessingMercadoPagoJobId === job.id
-                                    ? 'Redirigiendo...'
-                                    : 'Pagar con Mercado Pago'}
-                                </button>
+                                {inferPlanIdForJob(job) ? (
+                                  <button
+                                    onClick={() => handleMercadoPagoCheckout(job)}
+                                    disabled={isProcessingMercadoPagoJobId === job.id}
+                                    className="flex items-center gap-1 rounded-md bg-[#009EE3] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0086c3] disabled:opacity-50"
+                                  >
+                                    <CreditCardIcon className="h-4 w-4" />
+                                    {isProcessingMercadoPagoJobId === job.id
+                                      ? 'Redirigiendo...'
+                                      : 'Pagar con Mercado Pago'}
+                                  </button>
+                                ) : (
+                                  <Link
+                                    href={`/planes?payJobId=${job.id}`}
+                                    className="flex items-center justify-center gap-1 rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-700"
+                                  >
+                                    Elegir plan
+                                  </Link>
+                                )}
                                 {enableLegacyPayments && (
                                   <>
                                     <button
