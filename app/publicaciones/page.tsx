@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { jobService } from '@/services/jobService';
-import { paymentService } from '@/services/paymentService';
+import { paymentService, resolveMercadoPagoCheckoutUrl } from '@/services/paymentService';
 import { subscriptionService } from '@/services/subscriptionService';
 import { Job } from '@/types';
 import {
@@ -375,7 +375,7 @@ function PublicacionesPageContent() {
           { duration: 14000 }
         );
       }
-      window.location.href = preference.initPoint;
+      window.location.href = resolveMercadoPagoCheckoutUrl(preference);
     } catch (error: any) {
       const errorMessage =
         error?.response?.data?.message ||

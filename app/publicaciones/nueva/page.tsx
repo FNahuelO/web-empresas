@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import Layout from '@/components/Layout';
 import { jobService } from '@/services/jobService';
 import { subscriptionService } from '@/services/subscriptionService';
-import { paymentService } from '@/services/paymentService';
+import { paymentService, resolveMercadoPagoCheckoutUrl } from '@/services/paymentService';
 import { promotionService } from '@/services/promotionService';
 import { Job, Plan, LaunchTrialStatus } from '@/types';
 import { httpClient } from '@/lib/httpClient';
@@ -237,13 +237,13 @@ export default function NuevaPublicacionPage() {
       setPlans(activePlans);
       setPromoStatus(promoData);
 
-      // Si hay promo disponible, preseleccionarla; sino seleccionar plan del medio
+      // Solo preseleccionar promo gratuita; el plan de pago lo elige el usuario en el paso 2
       if (promoData?.eligible && !promoData.alreadyUsed && promoData.windowOpen) {
         setPromoSelected(true);
         setSelectedPlan(null);
-      } else if (activePlans.length > 0) {
-        const midIndex = Math.floor(activePlans.length / 2);
-        setSelectedPlan(activePlans[midIndex] || activePlans[0]);
+      } else {
+        setPromoSelected(false);
+        setSelectedPlan(null);
       }
     } catch (error) {
       console.error('Error loading plans:', error);
@@ -285,14 +285,6 @@ export default function NuevaPublicacionPage() {
         throw new Error(message);
       }
 
-      const planForCreation = selectedPlan || plans[0] || null;
-
-      if (!planForCreation) {
-        const message = 'No se pudo determinar el plan para la publicación. Recargá la página e intenta nuevamente.';
-        setFormSubmitError(message);
-        throw new Error(message);
-      }
-
       const provincia = data.location.trim();
       const localidad = data.localidad?.trim() || '';
       const locationStr = localidad ? `${localidad}, ${provincia}` : provincia;
@@ -317,24 +309,15 @@ export default function NuevaPublicacionPage() {
       if (data.minSalary > 0) jobData.minSalary = data.minSalary;
       if (data.maxSalary > 0) jobData.maxSalary = data.maxSalary;
 
-      // Enviar planId si hay un plan seleccionado
-      if (planForCreation?.id) {
-        jobData.planId = planForCreation.id;
-      }
-
       const job = await jobService.createJob(jobData);
       setCreatedJob(job);
-
-      persistPendingJobPlan(job.id, {
-        id: planForCreation?.id || null,
-        name: planForCreation?.name || null,
-      });
+      setSelectedPlan(null);
 
       // Verificar si el empleo necesita pago
       if (job.moderationStatus === 'PENDING_PAYMENT' || job.paymentStatus === 'PENDING' || !job.isPaid) {
         setNeedsPayment(true);
         setStep('payment');
-        toast.success('Publicación creada. Selecciona un plan y realiza el pago para publicarla.');
+        toast.success('Publicación creada. Elegí un plan y realizá el pago para publicarla.');
       } else {
         // El empleo fue creado directamente (plan PREMIUM/ENTERPRISE)
         setStep('success');
@@ -449,8 +432,14 @@ export default function NuevaPublicacionPage() {
         platform: 'web',
       });
 
-      
-      window.location.href = preference.sandboxInitPoint || preference.initPoint;
+      if (preference.testMode) {
+        toast(
+          'Modo prueba MP: NO uses "Dinero en cuenta". Elegí "Tarjeta" y cargá: 5031 7557 3453 0604, titular APRO, DNI 12345678.',
+          { duration: 14000 }
+        );
+      }
+
+      window.location.href = resolveMercadoPagoCheckoutUrl(preference);
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
@@ -1008,9 +997,14 @@ export default function NuevaPublicacionPage() {
             {/* Plan Selection */}
             <div className="rounded-lg bg-white p-6 shadow">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Selecciona un Plan</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                Elige el plan que mejor se adapte a tu publicación
+              <p className="text-sm text-gray-500 mb-4">
+                Elegí el plan que mejor se adapte a tu publicación. Podés cambiarlo antes de pagar.
               </p>
+              {!promoSelected && !selectedPlan && !loadingPlans && plans.length > 0 && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Todavía no elegiste un plan. Seleccioná una opción para habilitar el pago.
+                </div>
+              )}
 
               {loadingPlans ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

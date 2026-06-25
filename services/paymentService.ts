@@ -28,6 +28,14 @@ export interface MercadoPagoPreference {
   currency: string;
 }
 
+/** El backend ya resuelve producción vs sandbox en initPoint. Nunca priorizar sandboxInitPoint. */
+export function resolveMercadoPagoCheckoutUrl(preference: MercadoPagoPreference): string {
+  if (!preference.initPoint?.trim()) {
+    throw new Error('Mercado Pago no devolvió URL de checkout');
+  }
+  return preference.initPoint;
+}
+
 export interface MercadoPagoOrderStatus {
   orderId: string;
   status: string;
