@@ -147,6 +147,8 @@ export interface Application {
   estado?: string;
   appliedAt?: string;
   fechaAplicacion?: string;
+  /** True si ya hay mensajes entre la empresa y el postulante */
+  isContacted?: boolean;
   job?: Job;
   postulante?: PostulanteProfile;
 }
