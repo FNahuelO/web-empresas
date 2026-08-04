@@ -11,9 +11,12 @@ import {
   PaperAirplaneIcon,
   ArrowLeftIcon,
   CheckIcon,
+  EllipsisVerticalIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import Avatar from '@/components/Avatar';
+import Link from 'next/link';
 
 /** Extrae el nombre legible de un ApiUserInfo */
 function getUserName(user?: ApiUserInfo | null): string {
@@ -29,6 +32,12 @@ function getUserAvatar(user?: ApiUserInfo | null): string | null {
   if (user.postulante?.profilePicture) return user.postulante.profilePicture;
   if (user.empresa?.logo) return user.empresa.logo;
   return null;
+}
+
+/** Id de perfil del postulante (no confundir con userId) */
+function getPostulanteProfileId(user?: ApiUserInfo | null): string | null {
+  if (!user || user.userType !== 'POSTULANTE') return null;
+  return user.postulante?.id || null;
 }
 
 /** Formatea una fecha para mostrarla de forma legible */
@@ -65,6 +74,7 @@ function MensajesContent() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -132,6 +142,14 @@ function MensajesContent() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // Cerrar menú de conversación al hacer click fuera
+  useEffect(() => {
+    if (!openMenuUserId) return;
+    const handleClickOutside = () => setOpenMenuUserId(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openMenuUserId]);
+
   // Enviar mensaje
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,11 +187,16 @@ function MensajesContent() {
     }
   };
 
-  // Encontrar la info del usuario seleccionado
+  // Encontrar la info del usuario seleccionado (lista o mensajes cargados)
   const selectedConversation = conversations.find(
     (c) => c.user?.id === selectedUserId
   );
-  const selectedUserInfo = selectedConversation?.user ?? null;
+  const selectedUserInfo =
+    selectedConversation?.user ??
+    messages.find((m) => m.fromUserId === selectedUserId)?.fromUser ??
+    messages.find((m) => m.toUserId === selectedUserId)?.toUser ??
+    null;
+  const selectedPostulanteId = getPostulanteProfileId(selectedUserInfo);
 
   if (loading) {
     return (
@@ -222,48 +245,87 @@ function MensajesContent() {
                   const isSelected = conversation.user?.id === selectedUserId;
                   const lastMsgContent = conversation.lastMessage?.content || '';
                   const lastMsgDate = conversation.lastMessage?.createdAt || '';
+                  const postulanteId = getPostulanteProfileId(conversation.user);
+                  const conversationUserId = conversation.user?.id;
+                  const isMenuOpen = openMenuUserId === conversationUserId;
 
                   return (
-                    <button
-                      key={conversation.user?.id || Math.random()}
-                      onClick={() => setSelectedUserId(conversation.user?.id || null)}
-                      className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
+                    <div
+                      key={conversationUserId || Math.random()}
+                      className={`relative flex w-full items-center gap-1 transition-colors hover:bg-gray-50 ${
                         isSelected ? 'bg-blue-50 border-r-2 border-[#002D5A]' : ''
                       }`}
                     >
-                      {/* Avatar */}
-                      <div className="flex-shrink-0">
-                        <Avatar
-                          src={avatarUrl}
-                          alt={userName}
-                          size="md"
-                        />
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedUserId(conversationUserId || null)}
+                        className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
+                      >
+                        {/* Avatar */}
+                        <div className="flex-shrink-0">
+                          <Avatar
+                            src={avatarUrl}
+                            alt={userName}
+                            size="md"
+                          />
+                        </div>
 
-                      {/* Info */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <h3 className="truncate text-sm font-semibold text-gray-900">
-                            {userName}
-                          </h3>
-                          {lastMsgDate && (
-                            <span className="ml-2 flex-shrink-0 text-[10px] text-gray-400">
-                              {formatDate(lastMsgDate)}
-                            </span>
+                        {/* Info */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <h3 className="truncate text-sm font-semibold text-gray-900">
+                              {userName}
+                            </h3>
+                            {lastMsgDate && (
+                              <span className="ml-2 flex-shrink-0 text-[10px] text-gray-400">
+                                {formatDate(lastMsgDate)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <p className="truncate text-xs text-gray-500">
+                              {lastMsgContent || 'Sin mensajes'}
+                            </p>
+                            {conversation.unreadCount > 0 && (
+                              <span className="ml-2 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-[#002D5A] px-1.5 text-[10px] font-bold text-white">
+                                {conversation.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+
+                      {postulanteId && (
+                        <div className="relative flex-shrink-0 pr-2">
+                          <button
+                            type="button"
+                            aria-label="Opciones de conversación"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuUserId(isMenuOpen ? null : conversationUserId || null);
+                            }}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          >
+                            <EllipsisVerticalIcon className="h-5 w-5" />
+                          </button>
+                          {isMenuOpen && (
+                            <div
+                              className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Link
+                                href={`/postulantes/${postulanteId}`}
+                                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                onClick={() => setOpenMenuUserId(null)}
+                              >
+                                <UserIcon className="h-4 w-4 text-gray-500" />
+                                Ver perfil
+                              </Link>
+                            </div>
                           )}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <p className="truncate text-xs text-gray-500">
-                            {lastMsgContent || 'Sin mensajes'}
-                          </p>
-                          {conversation.unreadCount > 0 && (
-                            <span className="ml-2 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-[#002D5A] px-1.5 text-[10px] font-bold text-white">
-                              {conversation.unreadCount}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
+                      )}
+                    </div>
                   );
                 })
               )}
@@ -282,27 +344,54 @@ function MensajesContent() {
                 <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-3">
                   {/* Botón volver (mobile) */}
                   <button
+                    type="button"
                     onClick={() => setSelectedUserId(null)}
                     className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 md:hidden"
                   >
                     <ArrowLeftIcon className="h-5 w-5" />
                   </button>
 
-                  {/* Avatar */}
-                  <Avatar
-                    src={getUserAvatar(selectedUserInfo)}
-                    alt={getUserName(selectedUserInfo)}
-                    size="sm"
-                  />
-
-                  <div>
-                    <h2 className="text-sm font-semibold text-gray-900">
-                      {getUserName(selectedUserInfo)}
-                    </h2>
-                    <p className="text-[10px] text-gray-500">
-                      {selectedUserInfo?.userType === 'POSTULANTE' ? 'Postulante' : selectedUserInfo?.userType === 'EMPRESA' ? 'Empresa' : ''}
-                    </p>
-                  </div>
+                  {selectedPostulanteId ? (
+                    <Link
+                      href={`/postulantes/${selectedPostulanteId}`}
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 -ml-1 transition-colors hover:bg-gray-50"
+                      title="Ver perfil del postulante"
+                    >
+                      <Avatar
+                        src={getUserAvatar(selectedUserInfo)}
+                        alt={getUserName(selectedUserInfo)}
+                        size="sm"
+                      />
+                      <div className="min-w-0">
+                        <h2 className="truncate text-sm font-semibold text-gray-900 hover:text-[#002D5A]">
+                          {getUserName(selectedUserInfo)}
+                        </h2>
+                        <p className="text-[10px] text-gray-500">
+                          Postulante · Ver perfil
+                        </p>
+                      </div>
+                    </Link>
+                  ) : (
+                    <>
+                      <Avatar
+                        src={getUserAvatar(selectedUserInfo)}
+                        alt={getUserName(selectedUserInfo)}
+                        size="sm"
+                      />
+                      <div>
+                        <h2 className="text-sm font-semibold text-gray-900">
+                          {getUserName(selectedUserInfo)}
+                        </h2>
+                        <p className="text-[10px] text-gray-500">
+                          {selectedUserInfo?.userType === 'POSTULANTE'
+                            ? 'Postulante'
+                            : selectedUserInfo?.userType === 'EMPRESA'
+                              ? 'Empresa'
+                              : ''}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Mensajes */}
