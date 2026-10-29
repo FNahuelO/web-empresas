@@ -349,6 +349,13 @@ export default function JobDetailModal({ visible, job, onClose }: JobDetailModal
             </div>
           )}
 
+          {job.contactPhone && (
+            <div className="mb-6">
+              <h3 className="mb-2 text-lg font-bold text-gray-900">Teléfono para recibir CVs</h3>
+              <p className="text-gray-700">{job.contactPhone}</p>
+            </div>
+          )}
+
           {/* Razón de rechazo */}
           {(job.moderationStatus === 'REJECTED' || job.moderationStatus === 'AUTO_REJECTED') &&
             (job.moderationReason || job.autoRejectionReason) && (

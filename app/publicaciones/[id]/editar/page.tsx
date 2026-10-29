@@ -8,6 +8,7 @@ import { jobService } from '@/services/jobService';
 import { Job } from '@/types';
 import { httpClient } from '@/lib/httpClient';
 import { API_ENDPOINTS } from '@/lib/api';
+import { CONTACT_PHONE_ERROR, isValidContactPhone } from '@/lib/contactPhone';
 import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
@@ -37,6 +38,7 @@ interface JobFormData {
   description: string;
   requirements: string;
   benefits: string;
+  contactPhone: string;
   location: string;
   localidad: string;
   jobType: string;
@@ -121,6 +123,7 @@ export default function EditarPublicacionPage() {
       description: '',
       requirements: '',
       benefits: '',
+      contactPhone: '',
       location: '',
       localidad: '',
       jobType: 'TIEMPO_COMPLETO',
@@ -200,6 +203,11 @@ export default function EditarPublicacionPage() {
     setLoadingJob(true);
     try {
       const data = await jobService.getJobDetail(jobId);
+      if (!data.entitlements) {
+        // El detalle público no trae entitlements; se toman del listado de la empresa
+        const companyJobs = await jobService.getCompanyJobs().catch(() => [] as Job[]);
+        data.entitlements = companyJobs.find((item) => item.id === jobId)?.entitlements;
+      }
       setJob(data);
 
       // Verificar entitlement
@@ -219,6 +227,13 @@ export default function EditarPublicacionPage() {
           canModify: false,
           reason: 'El plan de esta publicación ha expirado',
           remaining: 0,
+          max: activeEntitlement.maxEdits,
+        });
+      } else if (data.moderationStatus === 'AUTO_REJECTED' || data.moderationStatus === 'REJECTED') {
+        // Un aviso rechazado siempre se puede corregir para volver a enviarlo a revisión
+        setEntitlementInfo({
+          canModify: true,
+          remaining: activeEntitlement.maxEdits,
           max: activeEntitlement.maxEdits,
         });
       } else if (activeEntitlement.maxEdits === 0) {
@@ -257,6 +272,7 @@ export default function EditarPublicacionPage() {
         description: data.description || '',
         requirements: data.requirements || '',
         benefits: data.benefits || '',
+        contactPhone: data.contactPhone || '',
         location: provincia,
         localidad: localidad,
         jobType: data.jobType || 'TIEMPO_COMPLETO',
@@ -293,6 +309,7 @@ export default function EditarPublicacionPage() {
         description: data.description.trim(),
         requirements: data.requirements.trim(),
         benefits: data.benefits.trim(),
+        contactPhone: data.contactPhone?.trim() || null,
         location: locationStr,
         jobType: data.jobType,
         workMode: data.modality,
@@ -662,6 +679,31 @@ export default function EditarPublicacionPage() {
                     {...register('benefits')}
                     className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-white p-6 shadow">
+                <h2 className="mb-4 text-lg font-semibold text-gray-900">Recepción de CVs</h2>
+                <div>
+                  <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700">
+                    Teléfono para recibir CVs (Opcional)
+                  </label>
+                  <input
+                    id="contactPhone"
+                    type="tel"
+                    inputMode="tel"
+                    placeholder="Ej: 11 2345-6789"
+                    {...register('contactPhone', {
+                      validate: (value) => isValidContactPhone(value) || CONTACT_PHONE_ERROR,
+                    })}
+                    className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Si lo completás, los postulantes van a poder enviarte su CV por WhatsApp o llamarte desde el aviso.
+                  </p>
+                  {errors.contactPhone && (
+                    <p className="mt-1 text-sm text-red-600">{errors.contactPhone.message}</p>
+                  )}
                 </div>
               </div>
             </div>

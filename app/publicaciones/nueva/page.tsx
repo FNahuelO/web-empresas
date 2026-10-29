@@ -11,6 +11,7 @@ import { promotionService } from '@/services/promotionService';
 import { Job, Plan, LaunchTrialStatus } from '@/types';
 import { httpClient } from '@/lib/httpClient';
 import { API_ENDPOINTS } from '@/lib/api';
+import { CONTACT_PHONE_ERROR, isValidContactPhone } from '@/lib/contactPhone';
 import toast from 'react-hot-toast';
 import {
   CheckIcon,
@@ -44,6 +45,7 @@ interface JobFormData {
   description: string;
   requirements: string;
   benefits: string;
+  contactPhone: string;
   location: string;
   localidad: string;
   jobType: string;
@@ -145,6 +147,7 @@ export default function NuevaPublicacionPage() {
       description: '',
       requirements: '',
       benefits: '',
+      contactPhone: '',
       location: '',
       localidad: '',
       jobType: 'TIEMPO_COMPLETO',
@@ -308,6 +311,7 @@ export default function NuevaPublicacionPage() {
 
       if (data.minSalary > 0) jobData.minSalary = data.minSalary;
       if (data.maxSalary > 0) jobData.maxSalary = data.maxSalary;
+      if (data.contactPhone?.trim()) jobData.contactPhone = data.contactPhone.trim();
 
       const job = await jobService.createJob(jobData);
       setCreatedJob(job);
@@ -318,6 +322,9 @@ export default function NuevaPublicacionPage() {
         setNeedsPayment(true);
         setStep('payment');
         toast.success('Publicación creada. Elegí un plan y realizá el pago para publicarla.');
+      } else if (job.moderationStatus === 'AUTO_REJECTED') {
+        setStep('success');
+        toast.error('Tu aviso necesita cambios antes de publicarse.');
       } else {
         // El empleo fue creado directamente (plan PREMIUM/ENTERPRISE)
         setStep('success');
@@ -938,6 +945,31 @@ export default function NuevaPublicacionPage() {
               </div>
             </div>
 
+            <div className="rounded-lg bg-white p-6 shadow">
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">Recepción de CVs</h2>
+              <div>
+                <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700">
+                  Teléfono para recibir CVs (Opcional)
+                </label>
+                <input
+                  id="contactPhone"
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="Ej: 11 2345-6789"
+                  {...register('contactPhone', {
+                    validate: (value) => isValidContactPhone(value) || CONTACT_PHONE_ERROR,
+                  })}
+                  className="mt-1 block w-full bg-white rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Si lo completás, los postulantes van a poder enviarte su CV por WhatsApp o llamarte desde el aviso.
+                </p>
+                {errors.contactPhone && (
+                  <p className="mt-1 text-sm text-red-600">{errors.contactPhone.message}</p>
+                )}
+              </div>
+            </div>
+
             {formSubmitError && (
               <div className="rounded-lg bg-red-50 p-4">
                 <div className="flex items-start">
@@ -1338,7 +1370,38 @@ export default function NuevaPublicacionPage() {
         )}
 
         {/* Step 3: Success */}
-        {step === 'success' && (
+        {step === 'success' && createdJob?.moderationStatus === 'AUTO_REJECTED' && (
+          <div className="rounded-lg bg-white p-12 text-center shadow">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+              <ExclamationTriangleIcon className="h-10 w-10 text-red-600" />
+            </div>
+            <h2 className="mt-6 text-2xl font-bold text-gray-900">Tu aviso necesita cambios</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              El filtro automático detectó texto no permitido. Corregilo y volvé a enviarlo para que lo revisemos.
+            </p>
+            {createdJob.autoRejectionReason && (
+              <div className="mx-auto mt-6 max-w-xl rounded-lg bg-red-50 p-4 text-left text-sm text-red-700">
+                <strong>Motivo:</strong> {createdJob.autoRejectionReason}
+              </div>
+            )}
+            <div className="mt-8 flex justify-center gap-4">
+              <button
+                onClick={() => router.push(`/publicaciones/${createdJob.id}/editar`)}
+                className="rounded-md bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Corregir publicación
+              </button>
+              <button
+                onClick={() => router.push('/publicaciones')}
+                className="rounded-md border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Ver Mis Publicaciones
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'success' && createdJob?.moderationStatus !== 'AUTO_REJECTED' && (
           <div className="rounded-lg bg-white p-12 text-center shadow">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <CheckCircleIcon className="h-10 w-10 text-green-600" />

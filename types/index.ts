@@ -26,6 +26,7 @@ export interface Job {
   description: string;
   requirements?: string;
   benefits?: string;
+  contactPhone?: string | null;
   location?: string;
   ciudad?: string;
   provincia?: string;
